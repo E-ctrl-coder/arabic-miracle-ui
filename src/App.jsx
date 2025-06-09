@@ -1,4 +1,3 @@
-// App.jsx
 import { useState } from 'react';
 
 export default function App() {
@@ -27,13 +26,16 @@ export default function App() {
   };
 
   const highlightWord = () => {
-    const { highlight } = result;
+    if (!result?.highlight) return word;
+
+    const { root = [], prefix = [], suffix = [] } = result.highlight;
     const chars = word.split('');
+
     return chars.map((ch, i) => {
       let color = 'text-black';
-      if (i >= highlight.root[0] && i <= highlight.root[1]) color = 'text-green-600';
-      else if (i >= highlight.prefix[0] && i <= highlight.prefix[1]) color = 'text-blue-600';
-      else if (i >= highlight.suffix[0] && i <= highlight.suffix[1]) color = 'text-red-600';
+      if (i >= root[0] && i <= root[1]) color = 'text-green-600';
+      else if (i >= prefix[0] && i <= prefix[1]) color = 'text-blue-600';
+      else if (i >= suffix[0] && i <= suffix[1]) color = 'text-red-600';
       return <span key={i} className={color}>{ch}</span>;
     });
   };
@@ -41,20 +43,23 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
       <h1 className="text-2xl font-bold mb-4">Arabic Word Analyzer</h1>
+
       <input
         className="border p-2 rounded w-72 mb-4 text-right"
         placeholder="أدخل كلمة عربية"
         value={word}
         onChange={(e) => setWord(e.target.value)}
       />
+
       <button
         onClick={analyzeWord}
-        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        disabled={loading}
+        className={`px-4 py-2 rounded text-white ${
+          loading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'
+        }`}
       >
-        Analyze
+        {loading ? 'Analyzing...' : 'Analyze'}
       </button>
-
-      {loading && <p className="mt-4">Analyzing...</p>}
 
       {result && !result.error && (
         <div className="mt-6 bg-white shadow rounded p-4 w-full max-w-md">
@@ -68,11 +73,17 @@ export default function App() {
           <p className="text-xl font-mono text-right">{highlightWord()}</p>
 
           <h2 className="font-semibold mt-4 mb-2">Examples:</h2>
-          <ul className="list-disc list-inside">
-            {result.examples.map((ex, i) => (
-              <li key={i}><span className="font-bold">{ex.ayah}</span>: {ex.translation}</li>
-            ))}
-          </ul>
+          {result.examples?.length ? (
+            <ul className="list-disc list-inside">
+              {result.examples.map((ex, i) => (
+                <li key={i}>
+                  <span className="font-bold">{ex.ayah}</span>: {ex.translation}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No examples found.</p>
+          )}
         </div>
       )}
 
