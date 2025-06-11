@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build", npm install @vitejs/plugin-react
+    "build": "vite build", 
     "preview": "vite preview"
+    npm install @vitejs/plugin-react
   },
   "dependencies": {
     "react": "^18.2.0",
