@@ -10,21 +10,21 @@ export default function App() {
     if (!word.trim()) return;
     setLoading(true);
     setResult(null);
+
     try {
-      const res = await fetch('https://arabic-miracle-api.onrender.com/analyze', {
+      const response = await fetch('https://arabic-miracle-api.onrender.com/analyze', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word }),
       });
-      const data = await res.json();
+      const data = await response.json();
       setResult(data);
-    } catch (error) {
-      console.error('Error analyzing word:', error);
-      setResult({ error: 'Failed to fetch analysis.' });
+    } catch (err) {
+      console.error(err);
+      setResult({ error: 'Something went wrong.' });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const highlightWord = () => {
@@ -33,9 +33,9 @@ export default function App() {
     const chars = word.split('');
     return chars.map((ch, i) => {
       let color = 'text-black';
-      if (i >= root[0] && i < root[1]) color = 'text-green-600';
-      else if (i >= prefix[0] && i < prefix[1]) color = 'text-blue-600';
-      else if (i >= suffix[0] && i < suffix[1]) color = 'text-red-600';
+      if (i >= root[0] && i <= root[1]) color = 'text-green-600';
+      else if (i >= prefix[0] && i <= prefix[1]) color = 'text-blue-600';
+      else if (i >= suffix[0] && i <= suffix[1]) color = 'text-red-600';
       return (
         <span key={i} className={color}>
           {ch}
@@ -55,10 +55,10 @@ export default function App() {
       />
       <button
         onClick={analyzeWord}
+        disabled={loading}
         className={`px-4 py-2 rounded text-white ${
           loading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'
         }`}
-        disabled={loading}
       >
         {loading ? 'Analyzing...' : 'Analyze'}
       </button>
@@ -70,11 +70,17 @@ export default function App() {
           <h2 className="font-semibold mb-2">Root:</h2>
           <p className="text-green-700">{result.root}</p>
 
-          <h2 className="font-semibold mt-4 mb-2">Translation:</h2>
-          <p className="text-gray-800">{result.meaning_en}</p>
+          <h2 className="font-semibold mt-4 mb-2">Meaning (Arabic):</h2>
+          <p>{result.meaning_ar}</p>
+
+          <h2 className="font-semibold mt-4 mb-2">Meaning (English):</h2>
+          <p>{result.meaning_en}</p>
 
           <h2 className="font-semibold mt-4 mb-2">Highlighted Word:</h2>
           <p className="text-xl font-mono text-right">{highlightWord()}</p>
+
+          <h2 className="font-semibold mt-4 mb-2">Qur'anic Occurrences:</h2>
+          <p>{result.quran_count} times</p>
 
           <h2 className="font-semibold mt-4 mb-2">Examples:</h2>
           {result.examples?.length ? (
@@ -91,10 +97,9 @@ export default function App() {
         </div>
       )}
 
-      {result?.error && (
-        <div className="mt-4 text-red-600">Error: {result.error}</div>
-      )}
+      {result?.error && <p className="text-red-600 mt-4">{result.error}</p>}
     </div>
   );
 }
+
 
