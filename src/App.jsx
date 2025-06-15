@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import axios from "axios";
-import "./App.css"; // Make sure this file exists and includes custom styles
-
 function App() {
   const [word, setWord] = useState("");
   const [result, setResult] = useState("");
