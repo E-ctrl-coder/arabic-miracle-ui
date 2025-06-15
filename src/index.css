@@ -1,19 +1,27 @@
-.root {
-  color: green;
-  font-weight: bold;
+/* src/index.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional: Add your custom styles below */
+body {
+  @apply bg-white text-gray-900 font-sans;
 }
 
-.extra {
-  color: orange;
-  font-weight: bold;
+h1, h2, h3, h4, h5, h6 {
+  @apply font-bold;
 }
 
-.prefix {
-  color: blue;
-  font-weight: bold;
+.container {
+  @apply mx-auto px-4;
 }
 
-.suffix {
-  color: purple;
-  font-weight: bold;
+/* Example classes for color-coding Arabic root letters and extra letters */
+.root-letter {
+  @apply text-green-600 font-semibold;
+}
+
+.extra-letter {
+  @apply text-blue-600;
 }
