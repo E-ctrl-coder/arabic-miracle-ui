@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import axios from "axios";
+import "./App.css"; // Make sure this file exists and includes custom styles
 
 function App() {
   const [word, setWord] = useState("");
@@ -7,83 +9,61 @@ function App() {
   const [error, setError] = useState("");
 
   const handleAnalyze = async () => {
-    if (!word.trim()) {
-      setError("Please enter a word.");
-      setResult("");
-      return;
-    }
-
     setLoading(true);
-    setResult("");
     setError("");
+    setResult("");
 
     try {
-      const response = await fetch("https://arabic-miracle-api.onrender.com/analyze", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ word }),
+      const response = await axios.post("https://arabic-miracle-api.onrender.com/analyze", {
+        word: word.trim(),
       });
 
-      const data = await response.json();
-
-      if (response.ok && data.result) {
-        setResult(data.result);
-      } else if (data.error) {
-        setError("Error: " + data.error);
+      if (response.data.result) {
+        setResult(response.data.result);
       } else {
-        setError("Unexpected response.");
+        setError("No result returned.");
       }
     } catch (err) {
-      setError("Failed to connect to the server.");
+      setError("Error: " + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: 20, fontFamily: "Arial" }}>
-      <h1>🔍 Arabic Word Analyzer</h1>
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+      <h1 className="text-3xl font-bold mb-6 text-blue-700">Arabic Miracle Word Analyzer</h1>
 
-      <input
-        type="text"
-        value={word}
-        onChange={(e) => setWord(e.target.value)}
-        placeholder="Enter Arabic word"
-        style={{ padding: 10, width: "100%", fontSize: 16, marginBottom: 10 }}
-      />
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={word}
+          onChange={(e) => setWord(e.target.value)}
+          placeholder="أدخل كلمة عربية"
+          className="border border-gray-300 p-2 rounded w-80 text-right focus:outline-none focus:ring focus:border-blue-400"
+          dir="rtl"
+        />
+        <button
+          onClick={handleAnalyze}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+        >
+          Analyze
+        </button>
+      </div>
 
-      <button
-        onClick={handleAnalyze}
-        disabled={loading}
-        style={{
-          padding: 10,
-          fontSize: 16,
-          width: "100%",
-          backgroundColor: "#007bff",
-          color: "white",
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        {loading ? "Analyzing..." : "Analyze"}
-      </button>
+      {loading && <p className="text-gray-500">Analyzing...</p>}
 
-      {error && (
-        <div style={{ color: "red", marginTop: 20 }}>
-          <strong>{error}</strong>
-        </div>
-      )}
+      {error && <p className="text-red-600">{error}</p>}
 
       {result && (
-        <div style={{ marginTop: 20, whiteSpace: "pre-wrap", background: "#f8f8f8", padding: 15 }}>
-          {result}
-        </div>
+        <div
+          className="bg-white shadow-lg p-6 rounded-lg max-w-2xl w-full text-right space-y-4 text-lg leading-loose border border-gray-200"
+          dangerouslySetInnerHTML={{ __html: result }}
+          dir="rtl"
+        />
       )}
     </div>
   );
 }
 
 export default App;
-
