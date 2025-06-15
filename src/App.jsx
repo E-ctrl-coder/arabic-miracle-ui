@@ -1,110 +1,89 @@
+import React, { useState } from "react";
 
-import { useState } from "react";
-
-export default function App() {
+function App() {
   const [word, setWord] = useState("");
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const analyzeWord = async () => {
-    if (!word.trim()) return;
+  const handleAnalyze = async () => {
+    if (!word.trim()) {
+      setError("Please enter a word.");
+      setResult("");
+      return;
+    }
+
     setLoading(true);
-    setResult(null);
+    setResult("");
+    setError("");
 
     try {
       const response = await fetch("https://arabic-miracle-api.onrender.com/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word })
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ word }),
       });
 
       const data = await response.json();
-      setResult(data);
+
+      if (response.ok && data.result) {
+        setResult(data.result);
+      } else if (data.error) {
+        setError("Error: " + data.error);
+      } else {
+        setError("Unexpected response.");
+      }
     } catch (err) {
-      console.error("Error:", err);
-      setResult({ error: "Server error" });
+      setError("Failed to connect to the server.");
     }
 
     setLoading(false);
   };
 
-  const highlightWord = () => {
-    if (!result?.highlight || !result.word) return result?.word || word;
-
-    const { root = [], prefix = [], suffix = [] } = result.highlight;
-    const chars = (result.word || word).split("");
-    return chars.map((ch, i) => {
-      let color = "text-black";
-      if (i >= root[0] && i <= root[1]) color = "text-green-600";
-      else if (i >= prefix[0] && i <= prefix[1]) color = "text-blue-600";
-      else if (i >= suffix[0] && i <= suffix[1]) color = "text-red-600";
-      return (
-        <span key={i} className={color}>
-          {ch}
-        </span>
-      );
-    });
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
-      <h1 className="text-2xl font-bold mb-4">Arabic Word Analyzer</h1>
+    <div style={{ maxWidth: 600, margin: "auto", padding: 20, fontFamily: "Arial" }}>
+      <h1>🔍 Arabic Word Analyzer</h1>
 
       <input
-        className="border p-2 rounded w-72 mb-4 text-right"
-        placeholder="أدخل كلمة عربية"
+        type="text"
         value={word}
         onChange={(e) => setWord(e.target.value)}
+        placeholder="Enter Arabic word"
+        style={{ padding: 10, width: "100%", fontSize: 16, marginBottom: 10 }}
       />
 
       <button
-        onClick={analyzeWord}
+        onClick={handleAnalyze}
         disabled={loading}
-        className={`px-4 py-2 rounded text-white ${
-          loading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
-        }`}
+        style={{
+          padding: 10,
+          fontSize: 16,
+          width: "100%",
+          backgroundColor: "#007bff",
+          color: "white",
+          border: "none",
+          cursor: "pointer",
+        }}
       >
         {loading ? "Analyzing..." : "Analyze"}
       </button>
 
+      {error && (
+        <div style={{ color: "red", marginTop: 20 }}>
+          <strong>{error}</strong>
+        </div>
+      )}
+
       {result && (
-        <div className="mt-6 bg-white shadow rounded p-4 w-full max-w-md">
-          {result.translation === "Not found" || result.error ? (
-            <p className="text-red-600 font-semibold">❌ Word not found.</p>
-          ) : (
-            <>
-              <h2 className="font-semibold mb-2">Root:</h2>
-              <p className="text-green-700">{result.root}</p>
-
-              <h2 className="font-semibold mt-4 mb-2">Meaning (Arabic):</h2>
-              <p>{result.meaning_ar || "-"}</p>
-
-              <h2 className="font-semibold mt-4 mb-2">Meaning (English):</h2>
-              <p>{result.meaning_en || result.translation}</p>
-
-              <h2 className="font-semibold mt-4 mb-2">Highlighted Word:</h2>
-              <p className="text-xl font-mono text-right">{highlightWord()}</p>
-
-              <h2 className="font-semibold mt-4 mb-2">Qur'anic Occurrences:</h2>
-              <p>{result.quran_count || "–"}</p>
-
-              <h2 className="font-semibold mt-4 mb-2">Examples:</h2>
-              {result.examples?.length ? (
-                <ul className="list-disc list-inside">
-                  {result.examples.map((ex, i) => (
-                    <li key={i}>
-                      <span className="font-bold">{ex.ayah}</span>: {ex.translation}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>No examples found.</p>
-              )}
-            </>
-          )}
+        <div style={{ marginTop: 20, whiteSpace: "pre-wrap", background: "#f8f8f8", padding: 15 }}>
+          {result}
         </div>
       )}
     </div>
   );
 }
+
+export default App;
 
