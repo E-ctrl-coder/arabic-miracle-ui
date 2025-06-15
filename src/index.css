@@ -1,3 +1,19 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+.root {
+  color: green;
+  font-weight: bold;
+}
+
+.extra {
+  color: orange;
+  font-weight: bold;
+}
+
+.prefix {
+  color: blue;
+  font-weight: bold;
+}
+
+.suffix {
+  color: purple;
+  font-weight: bold;
+}
