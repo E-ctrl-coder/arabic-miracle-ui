@@ -18,7 +18,7 @@ function App() {
     try {
       const response = await axios.post(
         "https://arabic-miracle-api.onrender.com/analyze",
-        { text: word.trim() } // Ensure the payload key is "text"
+        { text: word.trim() } // Payload key is "text"
       );
       
       // Use the "analysis" field from the returned data.
