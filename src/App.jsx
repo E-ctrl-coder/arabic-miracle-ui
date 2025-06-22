@@ -21,7 +21,7 @@ function App() {
         { text: word.trim() } // Ensure the payload key is "text"
       );
       
-      // Check for "analysis" in the returned data
+      // Use the "analysis" field from the returned data.
       if (response.data.analysis) {
         setResult(response.data.analysis);
       } else {
