@@ -11,13 +11,17 @@ function App() {
     setLoading(true);
     setError("");
     setResult("");
-
+    
+    // Debug: Log the trimmed word before sending
+    console.log("Sending text:", word.trim());
+    
     try {
-      const response = await axios.post("https://arabic-miracle-api.onrender.com/analyze", {
-        text: word.trim(), // Changed from "word" to "text"
-      });
-
-      // Adjust to check for "analysis" since that's what our API returns.
+      const response = await axios.post(
+        "https://arabic-miracle-api.onrender.com/analyze",
+        { text: word.trim() } // Ensure the payload key is "text"
+      );
+      
+      // Check for "analysis" in the returned data
       if (response.data.analysis) {
         setResult(response.data.analysis);
       } else {
@@ -32,7 +36,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <h1 className="text-3xl font-bold mb-6 text-blue-700">Arabic Miracle Word Analyzer</h1>
+      <h1 className="text-3xl font-bold mb-6 text-blue-700">
+        Arabic Miracle Word Analyzer
+      </h1>
 
       <div className="flex gap-2 mb-4">
         <input
@@ -52,9 +58,7 @@ function App() {
       </div>
 
       {loading && <p className="text-gray-500">Analyzing...</p>}
-
       {error && <p className="text-red-600">{error}</p>}
-
       {result && (
         <div
           className="bg-white shadow-lg p-6 rounded-lg max-w-2xl w-full text-right space-y-4 text-lg leading-loose border border-gray-200"
