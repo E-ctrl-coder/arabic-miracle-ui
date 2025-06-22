@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+
 function App() {
   const [word, setWord] = useState("");
   const [result, setResult] = useState("");
@@ -13,13 +14,14 @@ function App() {
 
     try {
       const response = await axios.post("https://arabic-miracle-api.onrender.com/analyze", {
-        word: word.trim(),
+        text: word.trim(), // Changed from "word" to "text"
       });
 
-      if (response.data.result) {
-        setResult(response.data.result);
+      // Adjust to check for "analysis" since that's what our API returns.
+      if (response.data.analysis) {
+        setResult(response.data.analysis);
       } else {
-        setError("No result returned.");
+        setError("No analysis returned.");
       }
     } catch (err) {
       setError("Error: " + (err.response?.data?.error || err.message));
