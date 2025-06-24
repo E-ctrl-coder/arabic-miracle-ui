@@ -1,27 +1,34 @@
-/* src/index.css */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Optional: Add your custom styles below */
+/* Optional: Custom styles */
 body {
-  @apply bg-white text-gray-900 font-sans;
+  font-family: 'Arial', sans-serif;
+  background-color: #f9fafb;
+  color: #111827;
+  line-height: 1.6;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  @apply font-bold;
+h1 {
+  font-size: 1.875rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
 }
 
-.container {
-  @apply mx-auto px-4;
+span.root {
+  color: #b91c1c; /* red-700 */
+  font-weight: bold;
 }
 
-/* Example classes for color-coding Arabic root letters and extra letters */
-.root-letter {
-  @apply text-green-600 font-semibold;
+span.prefix {
+  color: #2563eb; /* blue-600 */
 }
 
-.extra-letter {
-  @apply text-blue-600;
+span.suffix {
+  color: #16a34a; /* green-600 */
+}
+
+span.extra {
+  color: #7c3aed; /* purple-600 */
 }
