@@ -1,77 +1,56 @@
-import React, { useState } from 'react';
-
+import React, { useState } from "react";
+import "./App.css";
 
 function App() {
-  const [word, setWord] = useState('');
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [word, setWord] = useState("");
+  const [result, setResult] = useState("");
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setResult(null);
+  const handleAnalyze = async () => {
+    setResult("");
+    setError("");
+
+    if (!word.trim()) {
+      setError("⚠️ الرجاء إدخال كلمة عربية");
+      return;
+    }
 
     try {
-      const response = await fetch('https://your-backend-url.onrender.com/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word }),
+      const response = await fetch("https://arabic-miracle-api.onrender.com/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: word.trim() })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setResult(data);
+        setResult(data.result);
       } else {
-        setError(data.error || 'Unknown error occurred.');
+        setError(data.error || "حدث خطأ غير متوقع");
       }
     } catch (err) {
-      setError('Failed to connect to server.');
-    } finally {
-      setLoading(false);
+      setError("❌ تعذر الاتصال بالخادم. تحقق من الاتصال أو الرابط.");
     }
   };
 
   return (
-    <div className="container">
-      <h1 className="title">Arabic Miracle Word Analyzer</h1>
-      <form onSubmit={handleSubmit} className="form">
-        <input
-          type="text"
-          placeholder="Enter Arabic word"
-          value={word}
-          onChange={(e) => setWord(e.target.value)}
-          className="input"
-        />
-        <button type="submit" className="button" disabled={loading}>
-          {loading ? 'Analyzing...' : 'Analyze'}
-        </button>
-      </form>
+    <div className="App">
+      <h1>🔍 Arabic Miracle Word Analyzer</h1>
+      <input
+        type="text"
+        value={word}
+        placeholder="أدخل كلمة عربية مثل: كتبوا"
+        onChange={(e) => setWord(e.target.value)}
+      />
+      <button onClick={handleAnalyze}>تحليل</button>
 
-      {error && <p className="error">Error: {error}</p>}
-
+      {error && <div className="error">{error}</div>}
       {result && (
-        <div className="results">
-          <h2>Analysis Result</h2>
-
-          <div dangerouslySetInnerHTML={{ __html: result.colored_word }} />
-
-          <p><strong>Root (Arabic):</strong> <span className="highlight-root">{result.root_arabic}</span></p>
-          <p><strong>Root Translation:</strong> {result.root_translation}</p>
-          <p><strong>Word Translation:</strong> {result.word_translation}</p>
-          <p><strong>Scale:</strong> {result.scale}</p>
-          <p><strong>Type:</strong> {result.scale_type}</p>
-          <p><strong>Root Occurrences in Qur'an:</strong> {result.root_count}</p>
-
-          <h3>Sample Verses:</h3>
-          <ul>
-            {result.sample_verses.map((verse, idx) => (
-              <li key={idx} dangerouslySetInnerHTML={{ __html: verse }}></li>
-            ))}
-          </ul>
-        </div>
+        <div
+          className="result"
+          dangerouslySetInnerHTML={{ __html: result }}
+        />
       )}
     </div>
   );
