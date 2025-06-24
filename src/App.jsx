@@ -1,70 +1,77 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState } from 'react';
+import './App.css';
 
 function App() {
-  const [word, setWord] = useState("");
-  const [result, setResult] = useState("");
+  const [word, setWord] = useState('');
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const handleAnalyze = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
-    setError("");
-    setResult("");
-    
-    // Debug: Log the trimmed word before sending
-    console.log("Sending text:", word.trim());
-    
+    setError('');
+    setResult(null);
+
     try {
-      const response = await axios.post(
-        "https://arabic-miracle-api.onrender.com/analyze",
-        { text: word.trim() } // Payload key is "text"
-      );
-      
-      // Use the "analysis" field from the returned data.
-      if (response.data.analysis) {
-        setResult(response.data.analysis);
+      const response = await fetch('https://your-backend-url.onrender.com/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setResult(data);
       } else {
-        setError("No analysis returned.");
+        setError(data.error || 'Unknown error occurred.');
       }
     } catch (err) {
-      setError("Error: " + (err.response?.data?.error || err.message));
+      setError('Failed to connect to server.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <h1 className="text-3xl font-bold mb-6 text-blue-700">
-        Arabic Miracle Word Analyzer
-      </h1>
-
-      <div className="flex gap-2 mb-4">
+    <div className="container">
+      <h1 className="title">Arabic Miracle Word Analyzer</h1>
+      <form onSubmit={handleSubmit} className="form">
         <input
           type="text"
+          placeholder="Enter Arabic word"
           value={word}
           onChange={(e) => setWord(e.target.value)}
-          placeholder="أدخل كلمة عربية"
-          className="border border-gray-300 p-2 rounded w-80 text-right focus:outline-none focus:ring focus:border-blue-400"
-          dir="rtl"
+          className="input"
         />
-        <button
-          onClick={handleAnalyze}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-        >
-          Analyze
+        <button type="submit" className="button" disabled={loading}>
+          {loading ? 'Analyzing...' : 'Analyze'}
         </button>
-      </div>
+      </form>
 
-      {loading && <p className="text-gray-500">Analyzing...</p>}
-      {error && <p className="text-red-600">{error}</p>}
+      {error && <p className="error">Error: {error}</p>}
+
       {result && (
-        <div
-          className="bg-white shadow-lg p-6 rounded-lg max-w-2xl w-full text-right space-y-4 text-lg leading-loose border border-gray-200"
-          dangerouslySetInnerHTML={{ __html: result }}
-          dir="rtl"
-        />
+        <div className="results">
+          <h2>Analysis Result</h2>
+
+          <div dangerouslySetInnerHTML={{ __html: result.colored_word }} />
+
+          <p><strong>Root (Arabic):</strong> <span className="highlight-root">{result.root_arabic}</span></p>
+          <p><strong>Root Translation:</strong> {result.root_translation}</p>
+          <p><strong>Word Translation:</strong> {result.word_translation}</p>
+          <p><strong>Scale:</strong> {result.scale}</p>
+          <p><strong>Type:</strong> {result.scale_type}</p>
+          <p><strong>Root Occurrences in Qur'an:</strong> {result.root_count}</p>
+
+          <h3>Sample Verses:</h3>
+          <ul>
+            {result.sample_verses.map((verse, idx) => (
+              <li key={idx} dangerouslySetInnerHTML={{ __html: verse }}></li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
