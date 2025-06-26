@@ -2,8 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Optional custom styles */
+/* Optional: Arabic font and right-to-left direction */
 body {
   font-family: 'Noto Naskh Arabic', serif;
   direction: rtl;
+  background-color: #f9fafb; /* subtle light background */
 }
+
