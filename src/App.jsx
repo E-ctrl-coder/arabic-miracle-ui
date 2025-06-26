@@ -16,7 +16,7 @@ function App() {
     setResult(null);
 
     try {
-      const response = await fetch('https://your-backend-name.onrender.com/analyze', {
+      const response = await fetch('https://arabic-miracle-api.onrender.com', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word: input }),
