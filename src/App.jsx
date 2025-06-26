@@ -39,6 +39,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50 p-6 flex flex-col items-center">
       <h1 className="text-3xl font-bold mb-4 text-center">Arabic Word Analyzer</h1>
+
       <form onSubmit={handleSubmit} className="flex flex-col items-center mb-6 w-full max-w-md">
         <input
           type="text"
