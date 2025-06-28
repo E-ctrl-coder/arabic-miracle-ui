@@ -1,11 +1,10 @@
 // src/api.js
 const BASE_URL = "https://arabic-miracle-api.onrender.com";
-console.log("🔗 API base URL:", BASE_URL);
+console.log("🔗 API base URL is:", BASE_URL);
 
 export async function analyzeWord(word) {
-  // build full URL
-  const url = new URL("/analyze", BASE_URL).href;
-  console.log("🚀 Fetching:", url, "with word:", word);
+  const url = `${BASE_URL}/analyze`;
+  console.log("🚀 Fetching URL:", url, "with payload:", { word });
 
   const res = await fetch(url, {
     method: "POST",
@@ -13,19 +12,24 @@ export async function analyzeWord(word) {
     body: JSON.stringify({ word }),
   });
 
-  // if we got HTML back, dump first 200 chars
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("text/html")) {
-    const text = await res.text();
-    console.error("⚠️ Received HTML instead of JSON:", text.slice(0, 200));
-    throw new Error("Server returned HTML, not JSON. See console for snippet.");
+    const body = await res.text();
+    console.error(
+      "⚠️ Got HTML instead of JSON! First 200 chars:\n",
+      body.slice(0, 200)
+    );
+    throw new Error("Server returned HTML, not JSON. See console.");
   }
 
   if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
-    console.error("❌ API error payload:", payload);
-    throw new Error(payload.error || "Failed to analyze");
+    let payload = {};
+    try { payload = await res.json(); } catch {}
+    console.error("❌ API responded with error payload:", payload);
+    throw new Error(payload.error || "Unknown API error");
   }
 
-  return res.json();
+  const data = await res.json();
+  console.log("✅ API returned JSON:", data);
+  return data;
 }
