@@ -13,9 +13,13 @@ export default function Analyzer() {
     setError("");
     setResult(null);
     try {
+      console.clear();
+      console.log("🔎 Running analysis for:", word);
       const data = await analyzeWord(word);
+      console.log("✅ Analysis result:", data);
       setResult(data);
     } catch (e) {
+      console.error("🔥 Analysis error:", e);
       setError(e.message);
     } finally {
       setLoading(false);
@@ -29,7 +33,7 @@ export default function Analyzer() {
         className="border p-2 w-full"
         placeholder="أدخل كلمة عربية"
         value={word}
-        onChange={e => setWord(e.target.value)}
+        onChange={(e) => setWord(e.target.value)}
       />
       <button
         onClick={runAnalysis}
