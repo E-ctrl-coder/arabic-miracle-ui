@@ -1,3 +1,4 @@
+alert("🚨 api.js is loaded on your page!");
 // src/api.js
 const BASE_URL = "https://arabic-miracle-api.onrender.com";
 console.log("🔗 API base URL is:", BASE_URL);
