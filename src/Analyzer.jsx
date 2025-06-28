@@ -9,17 +9,15 @@ export default function Analyzer() {
   const [result, setResult] = useState(null);
 
   const runAnalysis = async () => {
+    console.clear();
+    console.log("🔎 Analyzing word:", word);
     setLoading(true);
     setError("");
     setResult(null);
     try {
-      console.clear();
-      console.log("🔎 Running analysis for:", word);
       const data = await analyzeWord(word);
-      console.log("✅ Analysis result:", data);
       setResult(data);
     } catch (e) {
-      console.error("🔥 Analysis error:", e);
       setError(e.message);
     } finally {
       setLoading(false);
@@ -42,9 +40,7 @@ export default function Analyzer() {
       >
         {loading ? "Analyzing…" : "Analyze"}
       </button>
-
       {error && <div className="text-red-600">Error: {error}</div>}
-
       {result && (
         <div className="bg-gray-50 p-4 rounded space-y-2">
           <div><strong>Word:</strong> {result.word}</div>
@@ -53,7 +49,6 @@ export default function Analyzer() {
           <div><strong>POS:</strong> {result.pos}</div>
           <div><strong>Translation:</strong> {result.translation}</div>
           <div><strong>Occurrences:</strong> {result.occurrence_count}</div>
-
           <div className="space-y-2 mt-2">
             {result.quran_occurrences.map((occ, i) => (
               <div key={i}>
