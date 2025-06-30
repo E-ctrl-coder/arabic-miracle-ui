@@ -1,36 +1,26 @@
-alert("🚨 api.js is loaded on your page!");
 // src/api.js
-const BASE_URL = "https://arabic-miracle-api.onrender.com";
-console.log("🔗 API base URL is:", BASE_URL);
 
+// Point this at your Render backend
+const API_BASE = "https://arabic-miracle-api.onrender.com";
+
+/**
+ * Send one Arabic word to your Flask API for analysis
+ * @param {string} word
+ * @returns {Promise<Object>} analysis result
+ */
 export async function analyzeWord(word) {
-  const url = `${BASE_URL}/analyze`;
-  console.log("🚀 Fetching URL:", url, "with payload:", { word });
-
-  const res = await fetch(url, {
+  const res = await fetch(`${API_BASE}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ word }),
   });
 
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("text/html")) {
-    const body = await res.text();
-    console.error(
-      "⚠️ Got HTML instead of JSON! First 200 chars:\n",
-      body.slice(0, 200)
-    );
-    throw new Error("Server returned HTML, not JSON. See console.");
-  }
-
+  // If the API returns an error status, throw it so your UI can catch/display it
   if (!res.ok) {
-    let payload = {};
-    try { payload = await res.json(); } catch {}
-    console.error("❌ API responded with error payload:", payload);
-    throw new Error(payload.error || "Unknown API error");
+    const err = await res.json();
+    throw new Error(err.error || `API error: ${res.status}`);
   }
 
-  const data = await res.json();
-  console.log("✅ API returned JSON:", data);
-  return data;
+  // Otherwise, return the JSON payload
+  return res.json();
 }
