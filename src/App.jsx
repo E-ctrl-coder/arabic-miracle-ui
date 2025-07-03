@@ -1,5 +1,6 @@
+// src/App.jsx
 import { useState } from 'react'
-import './App.css'
+import './index.css'
 
 function App() {
   const [word, setWord] = useState('')
