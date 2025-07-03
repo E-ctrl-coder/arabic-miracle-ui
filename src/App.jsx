@@ -1,92 +1,58 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
+import './App.css';
 
 function App() {
-  // 1) Component state
-  const [inputValue, setInputValue] = useState("");
+  const [word, setWord] = useState('');
   const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // 2) Analyze handler
-  const analyze = () => {
-    // clear previous states
-    setError("");
+  const handleAnalyze = async () => {
+    setError(null);
     setResult(null);
-    setLoading(true);
 
-    fetch("https://arabic-miracle-api.onrender.com/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ word: inputValue })
-    })
-      .then((res) => {
-        setLoading(false);
-        if (!res.ok) {
-          // non-200 status codes end up here
-          throw new Error(`Server returned ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((json) => {
-        console.log("API response:", json);
-        setResult(json);
-      })
-      .catch((err) => {
-        console.error("Fetch failed:", err);
-        setError("Sorry, could not analyze that word.");
+    try {
+      const res = await fetch('http://localhost:5000/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word }),
       });
+      const data = await res.json();
+      if (res.ok) {
+        setResult(data);
+      } else {
+        setError(data.error || 'Analysis failed');
+      }
+    } catch (e) {
+      setError('Server unreachable');
+    }
   };
 
-  // 3) UI rendering
   return (
-    <div style={{ maxWidth: 400, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h2>Arabic Word Analyzer</h2>
+    <div className="App">
+      <h1>Arabic Miracle Morphology</h1>
 
-      <input
-        type="text"
-        placeholder="Enter an Arabic word"
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        style={{ width: "100%", padding: "0.5rem", fontSize: "1rem" }}
-      />
+      <div className="input-group">
+        <input
+          type="text"
+          placeholder="Enter Arabic word"
+          value={word}
+          onChange={e => setWord(e.target.value)}
+        />
+        <button onClick={handleAnalyze}>Analyze</button>
+      </div>
 
-      <button
-        onClick={analyze}
-        style={{ marginTop: "1rem", padding: "0.5rem 1rem", fontSize: "1rem" }}
-      >
-        Analyze
-      </button>
-
-      {loading && <p>Loading…</p>}
-
-      {error && (
-        <p style={{ color: "red", marginTop: "1rem" }}>
-          {error}
-        </p>
-      )}
+      {error && <div className="error">{error}</div>}
 
       {result && (
-        <div style={{ marginTop: "1.5rem", lineHeight: 1.5 }}>
-          <h3>Result for "{result.word}"</h3>
-          <p>
-            <strong>Root:</strong> {result.data.root}
-          </p>
-          <p>
-            <strong>Lemma:</strong> {result.data.lemma}
-          </p>
-          <p>
-            <strong>Pattern:</strong> {result.data.pattern}
-          </p>
-          {result.data.prefix && (
-            <p>
-              <strong>Prefix:</strong> {result.data.prefix}
-            </p>
-          )}
-          {result.data.suffix && (
-            <p>
-              <strong>Suffix:</strong> {result.data.suffix}
-            </p>
-          )}
+        <div className="analysis">
+          <div className="token">
+            <span className="prefix">{result.prefix}</span>
+            <span className="root">{result.root}</span>
+            <span className="suffix">{result.suffix}</span>
+          </div>
+          <div className="count">
+            Occurrences of this root in the Quran: {result.root_count}
+          </div>
         </div>
       )}
     </div>
