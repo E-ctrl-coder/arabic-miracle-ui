@@ -6,6 +6,7 @@ function App() {
   const [prefix, setPrefix] = useState('')
   const [root, setRoot] = useState('')
   const [suffix, setSuffix] = useState('')
+  const [pattern, setPattern] = useState('')
   const [occurrences, setOccurrences] = useState(0)
   const [error, setError] = useState('')
 
@@ -33,6 +34,7 @@ function App() {
       setPrefix(data.prefix)
       setRoot(data.root)
       setSuffix(data.suffix)
+      setPattern(data.pattern)
       setOccurrences(data.occurrences)
     } catch (err) {
       setError('Network error: ' + err.message)
@@ -63,6 +65,7 @@ function App() {
             <span className="segment root">{root}</span>
             <span className="segment suffix">{suffix}</span>
           </p>
+          {pattern && <p>Pattern (وزن): {pattern}</p>}
           <p>Occurrences in Quran: {occurrences}</p>
         </div>
       )}
