@@ -1,21 +1,26 @@
-// src/App.jsx
-import { useState } from 'react'
-import './index.css'
+import React, { useEffect, useState } from 'react';
+import './index.css';
 
 function App() {
-  const [word, setWord] = useState('')
-  const [prefix, setPrefix] = useState('')
-  const [root, setRoot] = useState('')
-  const [suffix, setSuffix] = useState('')
-  const [pattern, setPattern] = useState('')
-  const [occurrences, setOccurrences] = useState(0)
-  const [error, setError] = useState('')
+  const [word, setWord] = useState('');
+  const [prefix, setPrefix] = useState('');
+  const [root, setRoot] = useState('');
+  const [suffix, setSuffix] = useState('');
+  const [pattern, setPattern] = useState('');
+  const [occurrences, setOccurrences] = useState(0);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    console.log('🔌 App mounted');
+  }, []);
 
   async function handleAnalyze() {
-    setError('')
+    console.log('🔍 handleAnalyze fired');
+    setError('');
+
     if (!word.trim()) {
-      setError('Please enter an Arabic word')
-      return
+      setError('Please enter an Arabic word');
+      return;
     }
 
     try {
@@ -23,22 +28,22 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word })
-      })
+      });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Server error' }))
-        setError(err.error || 'Server error')
-        return
+        const err = await res.json().catch(() => ({ error: 'Server error' }));
+        setError(err.error || 'Server error');
+        return;
       }
 
-      const data = await res.json()
-      setPrefix(data.prefix)
-      setRoot(data.root)
-      setSuffix(data.suffix)
-      setPattern(data.pattern)
-      setOccurrences(data.occurrences)
+      const data = await res.json();
+      setPrefix(data.prefix);
+      setRoot(data.root);
+      setSuffix(data.suffix);
+      setPattern(data.pattern);
+      setOccurrences(data.occurrences);
     } catch (err) {
-      setError('Network error: ' + err.message)
+      setError('Network error: ' + err.message);
     }
   }
 
@@ -71,7 +76,7 @@ function App() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
