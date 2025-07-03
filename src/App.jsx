@@ -1,64 +1,73 @@
-import React, { useState } from 'react';
-import './index.css'; // you can remove this line if index.css is already loaded in main.jsx
+import { useState } from 'react'
+import './App.css'
 
 function App() {
-  const [word, setWord] = useState('');
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [word, setWord] = useState('')
+  const [prefix, setPrefix] = useState('')
+  const [root, setRoot] = useState('')
+  const [suffix, setSuffix] = useState('')
+  const [occurrences, setOccurrences] = useState(0)
+  const [error, setError] = useState('')
 
-  const handleAnalyze = async () => {
-    setError(null);
-    setResult(null);
+  async function handleAnalyze() {
+    setError('')
+    if (!word.trim()) {
+      setError('Please enter an Arabic word')
+      return
+    }
 
     try {
-      const res = await fetch('http://localhost:5000/analyze', {
+      const res = await fetch('http://127.0.0.1:5000/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word }),
-      });
-      const data = await res.json();
-      if (res.ok) setResult(data);
-      else setError(data.error || 'Analysis failed');
-    } catch {
-      setError('Server unreachable');
+        body: JSON.stringify({ word })
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Server error' }))
+        setError(err.error || 'Server error')
+        return
+      }
+
+      const data = await res.json()
+      setPrefix(data.prefix)
+      setRoot(data.root)
+      setSuffix(data.suffix)
+      setOccurrences(data.occurrences)
+    } catch (err) {
+      setError('Network error: ' + err.message)
     }
-  };
+  }
 
   return (
     <div className="App">
-      <h1>Arabic Miracle Morphology</h1>
+      <h1>Arabic Morphology Analyzer</h1>
 
-      <div className="input-group">
-        <input
-          type="text"
-          placeholder="Enter Arabic word"
-          value={word}
-          onChange={e => setWord(e.target.value)}
-        />
-        <button onClick={handleAnalyze}>Analyze</button>
-      </div>
+      <input
+        type="text"
+        value={word}
+        onChange={e => setWord(e.target.value)}
+        placeholder="Enter Arabic word"
+      />
 
-      {error && <div className="error">{error}</div>}
+      <button onClick={handleAnalyze}>
+        Analyze
+      </button>
 
-      {result && (
-        <div className="analysis">
-          <div className="token">
-            {result.prefix && <span className="prefix">{result.prefix}</span>}
-            {result.root   && <span className="root">{result.root}</span>}
-            {result.suffix && <span className="suffix">{result.suffix}</span>}
-            {result.pattern && (
-              <div className="pattern">Pattern: {result.pattern}</div>
-            )}
-          </div>
-          {typeof result.root_count === 'number' && (
-            <div className="count">
-              Occurrences of this root in the Quran: {result.root_count}
-            </div>
-          )}
+      {error && <p className="error">{error}</p>}
+
+      {!error && root && (
+        <div className="result">
+          <p className="word">
+            <span className="segment prefix">{prefix}</span>
+            <span className="segment root">{root}</span>
+            <span className="segment suffix">{suffix}</span>
+          </p>
+          <p>Occurrences in Quran: {occurrences}</p>
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
