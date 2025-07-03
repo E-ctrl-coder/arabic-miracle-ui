@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import './index.css'; // you can remove this line if index.css is already loaded in main.jsx
 
 function App() {
   const [word, setWord] = useState('');
@@ -16,12 +17,9 @@ function App() {
         body: JSON.stringify({ word }),
       });
       const data = await res.json();
-      if (res.ok) {
-        setResult(data);
-      } else {
-        setError(data.error || 'Analysis failed');
-      }
-    } catch (e) {
+      if (res.ok) setResult(data);
+      else setError(data.error || 'Analysis failed');
+    } catch {
       setError('Server unreachable');
     }
   };
@@ -45,13 +43,18 @@ function App() {
       {result && (
         <div className="analysis">
           <div className="token">
-            <span className="prefix">{result.prefix}</span>
-            <span className="root">{result.root}</span>
-            <span className="suffix">{result.suffix}</span>
+            {result.prefix && <span className="prefix">{result.prefix}</span>}
+            {result.root   && <span className="root">{result.root}</span>}
+            {result.suffix && <span className="suffix">{result.suffix}</span>}
+            {result.pattern && (
+              <div className="pattern">Pattern: {result.pattern}</div>
+            )}
           </div>
-          <div className="count">
-            Occurrences of this root in the Quran: {result.root_count}
-          </div>
+          {typeof result.root_count === 'number' && (
+            <div className="count">
+              Occurrences of this root in the Quran: {result.root_count}
+            </div>
+          )}
         </div>
       )}
     </div>
