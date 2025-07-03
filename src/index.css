@@ -8,4 +8,17 @@ body {
   direction: rtl;
   background-color: #f9fafb; /* subtle light background */
 }
+.prefix {
+  color: #008080; /* teal */
+  font-weight: bold;
+}
 
+.root {
+  color: #8B0000; /* dark red */
+  font-weight: bold;
+}
+
+.suffix {
+  color: #DAA520; /* goldenrod */
+  font-weight: bold;
+}
