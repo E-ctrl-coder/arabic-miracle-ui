@@ -50,8 +50,7 @@ function App() {
 
   return (
     <div className="App" style={{ padding: '2rem' }}>
-      <h1>Arabic Morphology Analyzer</h1>
-
+      <h1>Arabic Morphology Analyzer 🔧</h1>
       <input
         type="text"
         value={word}
