@@ -1,55 +1,55 @@
 // src/App.jsx
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import './index.css'
 
 function App() {
   const [word, setWord] = useState('')
-  const [rawResponse, setRawResponse] = useState(null)
+  const [prefix, setPrefix] = useState('')
+  const [root, setRoot] = useState('')
+  const [suffix, setSuffix] = useState('')
+  const [pattern, setPattern] = useState('')
+  const [occurrences, setOccurrences] = useState(0)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    console.log('🔌 App mounted')
-  }, [])
-
   async function handleAnalyze() {
-    console.log('🔍 handleAnalyze fired with word:', JSON.stringify(word))
     setError('')
-    setRawResponse(null)
+    setPrefix('')
+    setRoot('')
+    setSuffix('')
+    setPattern('')
+    setOccurrences(0)
 
     if (!word.trim()) {
-      console.warn('⛔️ Empty word, showing error')
       setError('Please enter an Arabic word')
       return
     }
 
     try {
-      const res = await fetch('http://127.0.0.1:5000/analyze', {
+      const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word })
       })
-      console.log('📡 Fetch completed. Status:', res.status, res.statusText)
 
-      const data = await res.json().catch(e => {
-        console.error('⚠️ JSON parse failed', e)
-        throw new Error('Invalid JSON')
-      })
+      const data = await res.json()
 
       if (!res.ok) {
-        console.error('🚨 Server error payload:', data)
-        setError(data.error || `Server returned ${res.status}`)
-      } else {
-        console.log('✅ Received data:', data)
-        setRawResponse(data)
+        setError(data.error || `Server error ${res.status}`)
+        return
       }
-    } catch (err) {
-      console.error('🔥 handleAnalyze error:', err)
-      setError('Network or parsing error: ' + err.message)
+
+      setPrefix(data.prefix)
+      setRoot(data.root)
+      setSuffix(data.suffix)
+      setPattern(data.pattern)
+      setOccurrences(data.occurrences)
+    } catch (e) {
+      setError('Network error: ' + e.message)
     }
   }
 
   return (
-    <div className="App">
+    <div className="App" style={{ padding: '2rem' }}>
       <h1>Arabic Morphology Analyzer</h1>
 
       <input
@@ -57,24 +57,28 @@ function App() {
         value={word}
         onChange={e => setWord(e.target.value)}
         placeholder="Enter Arabic word"
+        style={{ fontSize: '1rem', padding: '0.5rem', width: '200px' }}
       />
 
-      <button onClick={handleAnalyze}>
+      <button onClick={handleAnalyze} style={{ marginLeft: '1rem' }}>
         Analyze
       </button>
 
       {error && (
-        <p className="error" style={{ color: 'red' }}>
+        <p className="error" style={{ color: 'red', marginTop: '1rem' }}>
           {error}
         </p>
       )}
 
-      {rawResponse && (
-        <div className="debug">
-          <h2>🔎 Raw Response</h2>
-          <pre style={{ textAlign: 'left', background: '#f4f4f4', padding: '1rem' }}>
-            {JSON.stringify(rawResponse, null, 2)}
-          </pre>
+      {root && !error && (
+        <div className="result" style={{ marginTop: '1rem' }}>
+          <p className="word">
+            <span className="segment prefix">{prefix}</span>
+            <span className="segment root">{root}</span>
+            <span className="segment suffix">{suffix}</span>
+          </p>
+          {pattern && <p>Pattern (وزن): {pattern}</p>}
+          <p>Occurrences in Quran: {occurrences}</p>
         </div>
       )}
     </div>
