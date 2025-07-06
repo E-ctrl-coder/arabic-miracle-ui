@@ -1,6 +1,6 @@
 [build]
-  publish = "build"
   command = "npm run build"
+  publish = "dist"
 
 [[redirects]]
   from    = "/api/*"
