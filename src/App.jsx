@@ -2,13 +2,13 @@
 import React, { useState } from 'react'
 import './index.css'
 
-function App() {
-  const [word, setWord] = useState('')
+export default function App() {
+  const [word, setWord]       = useState('')
   const [segments, setSegments] = useState([])
-  const [pattern, setPattern] = useState('')
+  const [pattern, setPattern]   = useState('')
   const [rootCount, setRootCount] = useState(null)
   const [examples, setExamples] = useState([])
-  const [error, setError] = useState('')
+  const [error, setError]       = useState('')
 
   async function handleAnalyze() {
     setError('')
@@ -29,7 +29,6 @@ function App() {
         body: JSON.stringify({ word: word.trim() })
       })
       const data = await res.json()
-
       if (!res.ok) {
         setError(data.error || `Server error ${res.status}`)
         return
@@ -43,6 +42,11 @@ function App() {
       setError('Network error: ' + e.message)
     }
   }
+
+  // derive prefix/root/suffix texts
+  const prefixText = segments.filter(s => s.type === 'prefix').map(s => s.text).join('')
+  const rootText   = segments.filter(s => s.type === 'root')  .map(s => s.text).join('')
+  const suffixText = segments.filter(s => s.type === 'suffix').map(s => s.text).join('')
 
   return (
     <div className="App p-8 bg-gray-50" dir="rtl">
@@ -64,12 +68,11 @@ function App() {
         </button>
       </div>
 
-      {error && (
-        <p className="text-red-600 mb-4">{error}</p>
-      )}
+      {error && <p className="text-red-600 mb-4">{error}</p>}
 
       {segments.length > 0 && !error && (
         <div className="space-y-3">
+          {/* 1. Colored word display */}
           <p className="text-xl">
             {segments.map((seg, i) => (
               <span key={i} className={seg.type}>
@@ -78,9 +81,18 @@ function App() {
             ))}
           </p>
 
+          {/* 2. Explicit segmentation */}
+          <p>حرف زائد (Prefix): {prefixText || '–'}</p>
+          <p>جذر (Root): {rootText}</p>
+          <p>حرف زائد (Suffix): {suffixText || '–'}</p>
+
+          {/* 3. Pattern */}
           <p>الوزن (Pattern): {pattern}</p>
+
+          {/* 4. Occurrence count */}
           <p>عدد مرات الجذر في القرآن: {rootCount}</p>
 
+          {/* 5. Example verses */}
           {examples.length > 0 && (
             <>
               <h4 className="mt-4">نماذج من الآيات:</h4>
@@ -98,5 +110,3 @@ function App() {
     </div>
   )
 }
-
-export default App
