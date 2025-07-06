@@ -4,20 +4,18 @@ import './index.css'
 
 function App() {
   const [word, setWord] = useState('')
-  const [prefix, setPrefix] = useState('')
-  const [root, setRoot] = useState('')
-  const [suffix, setSuffix] = useState('')
+  const [segments, setSegments] = useState([])
   const [pattern, setPattern] = useState('')
-  const [occurrences, setOccurrences] = useState(0)
+  const [rootCount, setRootCount] = useState(null)
+  const [examples, setExamples] = useState([])
   const [error, setError] = useState('')
 
   async function handleAnalyze() {
     setError('')
-    setPrefix('')
-    setRoot('')
-    setSuffix('')
+    setSegments([])
     setPattern('')
-    setOccurrences(0)
+    setRootCount(null)
+    setExamples([])
 
     if (!word.trim()) {
       setError('Please enter an Arabic word')
@@ -28,22 +26,18 @@ function App() {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word })
+        body: JSON.stringify({ word: word.trim() })
       })
-
       const data = await res.json()
-
       if (!res.ok) {
         setError(data.error || `Server error ${res.status}`)
         return
       }
 
-      setPrefix(data.prefix)
-      setRoot(data.root)
-      setSuffix(data.suffix)
+      setSegments(data.segments)
       setPattern(data.pattern)
-      // use the correct field from the API response
-      setOccurrences(data.quran_occurrences)
+      setRootCount(data.root_occurrences)
+      setExamples(data.example_verses)
     } catch (e) {
       setError('Network error: ' + e.message)
     }
@@ -60,30 +54,13 @@ function App() {
         placeholder="Enter Arabic word"
         style={{ fontSize: '1rem', padding: '0.5rem', width: '200px' }}
       />
-
       <button onClick={handleAnalyze} style={{ marginLeft: '1rem' }}>
         Analyze
       </button>
 
       {error && (
-        <p className="error" style={{ color: 'red', marginTop: '1rem' }}>
-          {error}
-        </p>
+        <p style={{ color: 'red', marginTop: '1rem' }}>{error}</p>
       )}
 
-      {root && !error && (
-        <div className="result" style={{ marginTop: '1rem' }}>
-          <p className="word">
-            <span className="segment prefix">{prefix}</span>
-            <span className="segment root">{root}</span>
-            <span className="segment suffix">{suffix}</span>
-          </p>
-          {pattern && <p>Pattern (وزن): {pattern}</p>}
-          <p>Occurrences in Quran: {occurrences}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export default App
+      {segments.length > 0 && !error && (
+        <div style={{ marginTop: '
