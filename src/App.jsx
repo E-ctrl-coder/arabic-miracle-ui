@@ -35,7 +35,6 @@ function App() {
         return
       }
 
-      // populate state from your JSON
       setSegments(data.segments)
       setPattern(data.pattern)
       setRootCount(data.root_occurrences)
@@ -46,45 +45,49 @@ function App() {
   }
 
   return (
-    <div className="App" style={{ padding: '2rem' }}>
-      <h1>Arabic Morphology Analyzer</h1>
+    <div className="App p-8 bg-gray-50" dir="rtl">
+      <h1 className="text-2xl mb-4">محلل الصرف العربي</h1>
 
-      <input
-        type="text"
-        value={word}
-        onChange={e => setWord(e.target.value)}
-        placeholder="Enter Arabic word"
-        style={{ fontSize: '1rem', padding: '0.5rem', width: '200px' }}
-      />
-      <button onClick={handleAnalyze} style={{ marginLeft: '1rem' }}>
-        Analyze
-      </button>
+      <div className="flex items-center mb-4">
+        <input
+          type="text"
+          value={word}
+          onChange={e => setWord(e.target.value)}
+          placeholder="أدخل كلمة عربية"
+          className="border p-2 w-64"
+        />
+        <button
+          onClick={handleAnalyze}
+          className="ml-4 bg-blue-600 text-white p-2 rounded"
+        >
+          تحليل
+        </button>
+      </div>
 
       {error && (
-        <p style={{ color: 'red', marginTop: '1rem' }}>{error}</p>
+        <p className="text-red-600 mb-4">{error}</p>
       )}
 
       {segments.length > 0 && !error && (
-        <div style={{ marginTop: '1.5rem' }}>
-          {/* colored word display */}
-          <p className="word">
+        <div className="space-y-3">
+          <p className="text-xl">
             {segments.map((seg, i) => (
-              <span key={i} className={`segment-${seg.type}`}>
+              <span key={i} className={seg.type}>
                 {seg.text}
               </span>
             ))}
           </p>
 
-          <p>Pattern (وزن): {pattern}</p>
-          <p>Root occurrences in Quran: {rootCount}</p>
+          <p>الوزن (Pattern): {pattern}</p>
+          <p>عدد مرات الجذر في القرآن: {rootCount}</p>
 
           {examples.length > 0 && (
             <>
-              <h4>Example Verses:</h4>
-              <ol>
+              <h4 className="mt-4">نماذج من الآيات:</h4>
+              <ol className="list-decimal list-inside">
                 {examples.map(v => (
                   <li key={v.verseNumber}>
-                    <strong>Verse {v.verseNumber}:</strong> {v.text}
+                    <strong>آية {v.verseNumber}:</strong> {v.text}
                   </li>
                 ))}
               </ol>
