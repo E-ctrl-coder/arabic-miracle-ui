@@ -29,11 +29,13 @@ function App() {
         body: JSON.stringify({ word: word.trim() })
       })
       const data = await res.json()
+
       if (!res.ok) {
         setError(data.error || `Server error ${res.status}`)
         return
       }
 
+      // populate state from your JSON
       setSegments(data.segments)
       setPattern(data.pattern)
       setRootCount(data.root_occurrences)
@@ -63,4 +65,35 @@ function App() {
       )}
 
       {segments.length > 0 && !error && (
-        <div style={{ marginTop: '
+        <div style={{ marginTop: '1.5rem' }}>
+          {/* colored word display */}
+          <p className="word">
+            {segments.map((seg, i) => (
+              <span key={i} className={`segment-${seg.type}`}>
+                {seg.text}
+              </span>
+            ))}
+          </p>
+
+          <p>Pattern (وزن): {pattern}</p>
+          <p>Root occurrences in Quran: {rootCount}</p>
+
+          {examples.length > 0 && (
+            <>
+              <h4>Example Verses:</h4>
+              <ol>
+                {examples.map(v => (
+                  <li key={v.verseNumber}>
+                    <strong>Verse {v.verseNumber}:</strong> {v.text}
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default App
