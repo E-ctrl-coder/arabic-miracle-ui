@@ -42,32 +42,16 @@ function App() {
       setRoot(data.root)
       setSuffix(data.suffix)
       setPattern(data.pattern)
-      setOccurrences(data.occurrences)
+      // use the correct field from the API response
+      setOccurrences(data.quran_occurrences)
     } catch (e) {
       setError('Network error: ' + e.message)
     }
   }
 
-  // 🔧 Temporary Diagnostic: Direct POST to Render backend
-  async function testDirectToRender() {
-    try {
-      const res = await fetch('https://arabic-miracle-api.onrender.com/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word })
-      })
-      const data = await res.json()
-      console.log('✅ Direct POST to Render returned:', data)
-      alert('Success: ' + JSON.stringify(data))
-    } catch (err) {
-      console.error('❌ Error POSTing to Render:', err)
-      alert('Error: ' + err.message)
-    }
-  }
-
   return (
     <div className="App" style={{ padding: '2rem' }}>
-      <h1>Arabic Morphology Analyzer 🔧</h1>
+      <h1>Arabic Morphology Analyzer</h1>
 
       <input
         type="text"
@@ -79,20 +63,6 @@ function App() {
 
       <button onClick={handleAnalyze} style={{ marginLeft: '1rem' }}>
         Analyze
-      </button>
-
-      {/* 🧪 Direct backend test */}
-      <button
-        onClick={testDirectToRender}
-        style={{
-          marginLeft: '1rem',
-          backgroundColor: '#eee',
-          border: '1px solid #ccc',
-          padding: '0.4rem 0.8rem',
-          cursor: 'pointer'
-        }}
-      >
-        Test Direct to Render
       </button>
 
       {error && (
