@@ -1,11 +1,13 @@
-# netlify.toml
-
 [build]
-  publish = "build"            # or "dist" / whatever you use
-  command = "npm run build"    # or "yarn build"
+  publish = "build"
+  command = "npm run build"
 
 [[redirects]]
-  from     = "/api/*"
-  to       = "https://arabic-miracle-api.onrender.com/:splat"
-  status   = 200
-  force    = true
+  from    = "/api/*"
+  to      = "https://arabic-miracle-api.onrender.com/:splat"
+  status  = 200
+
+[[redirects]]
+  from    = "/*"
+  to      = "/index.html"
+  status  = 200
