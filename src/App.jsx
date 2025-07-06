@@ -54,7 +54,7 @@ function App() {
       const res = await fetch('https://arabic-miracle-api.onrender.com/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: 'ضرب' })
+        body: JSON.stringify({ word })
       })
       const data = await res.json()
       console.log('✅ Direct POST to Render returned:', data)
