@@ -29,6 +29,43 @@ export default function App() {
         body: JSON.stringify({ word: word.trim() })
       })
       const data = await res.json()
+      async function handleAnalyze() {
+  setError('')
+  setSegments([])
+  setPattern('')
+  setRootCount(null)
+  setExamples([])
+
+  if (!word.trim()) {
+    setError('Please enter an Arabic word')
+    return
+  }
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word: word.trim() })
+    })
+
+    const data = await res.json()
+
++   // ← Add this line to see exactly what comes back
++   console.log('🔍 analyze response:', data)
+
+    if (!res.ok) {
+      setError(data.error || `Server error ${res.status}`)
+      return
+    }
+
+    setSegments(data.segments)
+    setPattern(data.pattern)
+    setRootCount(data.root_occurrences)
+    setExamples(data.example_verses)
+  } catch (e) {
+    setError('Network error: ' + e.message)
+  }
+}
       if (!res.ok) {
         setError(data.error || `Server error ${res.status}`)
         return
