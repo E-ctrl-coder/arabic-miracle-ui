@@ -4,25 +4,24 @@
   command = "npm run build"
   publish = "dist"
 
-# 1) Proxy /analyze to your Flask API on Render
+# 1) Proxy /analyze to your Flask API
 [[redirects]]
-  from     = "/analyze"
-  to       = "https://arabic-miracle-api.onrender.com/analyze"
-  status   = 200
-  force    = true
-  # forward query parameters (e.g. ?word=ضرب)
-  query    = { forward = true }
+  from   = "/analyze"
+  to     = "https://arabic-miracle-api.onrender.com/analyze"
+  status = 200
+  force  = true
+  query  = { forward = true }
 
-# 2) Proxy /debug/* for your debug endpoint
+# 2) Proxy /debug/* to the debug endpoint
 [[redirects]]
-  from     = "/debug/*"
-  to       = "https://arabic-miracle-api.onrender.com/debug/:splat"
-  status   = 200
-  force    = true
-  query    = { forward = true }
+  from   = "/debug/*"
+  to     = "https://arabic-miracle-api.onrender.com/debug/:splat"
+  status = 200
+  force  = true
+  query  = { forward = true }
 
-# 3) Single-page-app fallback (all other requests → index.html)
+# 3) SPA fallback: everything else → index.html
 [[redirects]]
-  from     = "/*"
-  to       = "/index.html"
-  status   = 200
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
