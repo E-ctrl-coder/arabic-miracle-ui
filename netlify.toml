@@ -1,27 +1,4 @@
 # netlify.toml
-
 [build]
   command = "npm run build"
   publish = "dist"
-
-# 1) Proxy /analyze to your Flask API
-[[redirects]]
-  from   = "/analyze"
-  to     = "https://arabic-miracle-api.onrender.com/analyze"
-  status = 200
-  force  = true
-  query  = { forward = true }
-
-# 2) Proxy /debug/* to the debug endpoint
-[[redirects]]
-  from   = "/debug/*"
-  to     = "https://arabic-miracle-api.onrender.com/debug/:splat"
-  status = 200
-  force  = true
-  query  = { forward = true }
-
-# 3) SPA fallback: everything else → index.html
-[[redirects]]
-  from   = "/*"
-  to     = "/index.html"
-  status = 200
