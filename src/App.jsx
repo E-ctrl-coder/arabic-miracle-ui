@@ -3,21 +3,15 @@ import React, { useState } from 'react'
 import './index.css'
 
 export default function App() {
-  const [word, setWord]             = useState('')
-  const [segments, setSegments]     = useState([])
-  const [pattern, setPattern]       = useState('')
-  const [rootCount, setRootCount]   = useState(null)
-  const [examples, setExamples]     = useState([])
-  const [error, setError]           = useState('')
+  const [word, setWord]           = useState('')
+  const [results, setResults]     = useState([])       // ← all parses here
+  const [error, setError]         = useState('')
   const [suggestions, setSuggestions] = useState([])
 
   async function handleAnalyze() {
     setError('')
     setSuggestions([])
-    setSegments([])
-    setPattern('')
-    setRootCount(null)
-    setExamples([])
+    setResults([])
 
     if (!word.trim()) {
       setError('Please enter an Arabic word')
@@ -25,33 +19,21 @@ export default function App() {
     }
 
     try {
-      // ← use the proxied /analyze endpoint (no /api prefix)
       const res = await fetch('/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word: word.trim() })
       })
-
       const data = await res.json()
 
       if (!res.ok) {
         setError(data.error || `Server error ${res.status}`)
-        if (data.suggestions) {
-          setSuggestions(data.suggestions)
-        }
+        if (data.suggestions) setSuggestions(data.suggestions)
         return
       }
 
-      // data is an array of parse-results—grab the first one
-      const result = Array.isArray(data) && data.length > 0
-        ? data[0]
-        : { segments: [], pattern: '', root_occurrences: 0, example_verses: [] }
-
-      setSegments(result.segments)
-      setPattern(result.pattern)
-      setRootCount(result.root_occurrences)
-      setExamples(result.example_verses)
-
+      // Ensure it's always an array
+      setResults(Array.isArray(data) ? data : [data])
     } catch (e) {
       setError('Network error: ' + e.message)
     }
@@ -84,8 +66,11 @@ export default function App() {
             <p>
               Did you mean:{' '}
               {suggestions.map((s,i) => (
-                <span key={i} className="underline cursor-pointer"
-                  onClick={() => setWord(s)}>
+                <span
+                  key={i}
+                  className="underline cursor-pointer"
+                  onClick={() => setWord(s)}
+                >
                   {s}{i < suggestions.length-1 && ', '}
                 </span>
               ))}
@@ -94,22 +79,27 @@ export default function App() {
         </div>
       )}
 
-      {segments.length > 0 && !error && (
-        <div className="space-y-3">
+      {/* Loop over every parse result */}
+      {results.map((r, idx) => (
+        <div key={idx} className="space-y-3 mb-6 border p-4 rounded">
+          <p className="text-sm text-gray-600">Source: {r.source}</p>
+
           <p className="text-xl">
-            {segments.map((seg,i)=>(
+            {r.segments.map((seg, i) => (
               <span key={i} className={seg.type}>
                 {seg.text}
               </span>
             ))}
           </p>
-          <p>الوزن (Pattern): {pattern}</p>
-          <p>عدد مرات الجذر في القرآن: {rootCount}</p>
-          {examples.length > 0 && (
+
+          <p>الوزن (Pattern): {r.pattern}</p>
+          <p>عدد مرات الجذر في القرآن: {r.root_occurrences}</p>
+
+          {r.example_verses.length > 0 && (
             <>
               <h4 className="mt-4">نماذج من الآيات:</h4>
               <ol className="list-decimal list-inside">
-                {examples.map(v=>(
+                {r.example_verses.map(v => (
                   <li key={v.verseNumber}>
                     <strong>آية {v.verseNumber}:</strong> {v.text}
                   </li>
@@ -118,7 +108,7 @@ export default function App() {
             </>
           )}
         </div>
-      )}
+      ))}
     </div>
   )
 }
