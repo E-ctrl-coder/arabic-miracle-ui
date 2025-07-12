@@ -1,13 +1,28 @@
+# netlify.toml
+
 [build]
   command = "npm run build"
   publish = "dist"
 
+# 1) Proxy /analyze to your Flask API on Render
 [[redirects]]
-  from    = "/api/*"
-  to      = "https://arabic-miracle-api.onrender.com/:splat"
-  status  = 200
+  from     = "/analyze"
+  to       = "https://arabic-miracle-api.onrender.com/analyze"
+  status   = 200
+  force    = true
+  # forward query parameters (e.g. ?word=ضرب)
+  query    = { forward = true }
 
+# 2) Proxy /debug/* for your debug endpoint
 [[redirects]]
-  from    = "/*"
-  to      = "/index.html"
-  status  = 200
+  from     = "/debug/*"
+  to       = "https://arabic-miracle-api.onrender.com/debug/:splat"
+  status   = 200
+  force    = true
+  query    = { forward = true }
+
+# 3) Single-page-app fallback (all other requests → index.html)
+[[redirects]]
+  from     = "/*"
+  to       = "/index.html"
+  status   = 200
