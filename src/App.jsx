@@ -3,12 +3,12 @@ import React, { useState } from 'react'
 import './index.css'
 
 export default function App() {
-  const [word, setWord]         = useState('')
-  const [segments, setSegments] = useState([])
-  const [pattern, setPattern]   = useState('')
-  const [rootCount, setRootCount] = useState(null)
-  const [examples, setExamples] = useState([])
-  const [error, setError]       = useState('')
+  const [word, setWord]             = useState('')
+  const [segments, setSegments]     = useState([])
+  const [pattern, setPattern]       = useState('')
+  const [rootCount, setRootCount]   = useState(null)
+  const [examples, setExamples]     = useState([])
+  const [error, setError]           = useState('')
   const [suggestions, setSuggestions] = useState([])
 
   async function handleAnalyze() {
@@ -25,11 +25,13 @@ export default function App() {
     }
 
     try {
-      const res  = await fetch('/api/analyze', {
+      // ← use the proxied /analyze endpoint (no /api prefix)
+      const res = await fetch('/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word: word.trim() })
       })
+
       const data = await res.json()
 
       if (!res.ok) {
@@ -40,10 +42,16 @@ export default function App() {
         return
       }
 
-      setSegments(data.segments)
-      setPattern(data.pattern)
-      setRootCount(data.root_occurrences)
-      setExamples(data.example_verses)
+      // data is an array of parse-results—grab the first one
+      const result = Array.isArray(data) && data.length > 0
+        ? data[0]
+        : { segments: [], pattern: '', root_occurrences: 0, example_verses: [] }
+
+      setSegments(result.segments)
+      setPattern(result.pattern)
+      setRootCount(result.root_occurrences)
+      setExamples(result.example_verses)
+
     } catch (e) {
       setError('Network error: ' + e.message)
     }
@@ -78,8 +86,7 @@ export default function App() {
               {suggestions.map((s,i) => (
                 <span key={i} className="underline cursor-pointer"
                   onClick={() => setWord(s)}>
-                  {s}
-                  {i < suggestions.length-1 && ', '}
+                  {s}{i < suggestions.length-1 && ', '}
                 </span>
               ))}
             </p>
