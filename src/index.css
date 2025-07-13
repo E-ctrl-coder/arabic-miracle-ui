@@ -1,23 +1,24 @@
 /* src/index.css */
 
-/* Optional: Arabic font and right-to-left direction */
+/* Arabic font + RTL */
 body {
   font-family: 'Noto Naskh Arabic', serif;
   direction: rtl;
-  background-color: #f9fafb; /* subtle light background */
+  background-color: #f9fafb;
 }
 
-.prefix {
-  color: yellow;      /* prefixes in yellow */
+/* Match the classNames your JSX emits */
+.segment-prefix {
+  color: yellow;
   font-weight: bold;
 }
 
-.root {
-  color: black;       /* roots in black */
+.segment-root {
+  color: black;
   font-weight: bold;
 }
 
-.suffix {
-  color: blue;        /* suffixes in blue */
+.segment-suffix {
+  color: blue;
   font-weight: bold;
 }
