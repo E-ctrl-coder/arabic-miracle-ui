@@ -3,9 +3,9 @@ import React, { useState } from 'react'
 import './index.css'
 
 export default function App() {
-  const [word, setWord]           = useState('')
-  const [results, setResults]     = useState([])       // ← all parses here
-  const [error, setError]         = useState('')
+  const [word, setWord]               = useState('')
+  const [results, setResults]         = useState([])
+  const [error, setError]             = useState('')
   const [suggestions, setSuggestions] = useState([])
 
   async function handleAnalyze() {
@@ -32,7 +32,6 @@ export default function App() {
         return
       }
 
-      // Ensure it's always an array
       setResults(Array.isArray(data) ? data : [data])
     } catch (e) {
       setError('Network error: ' + e.message)
@@ -65,7 +64,7 @@ export default function App() {
           {suggestions.length > 0 && (
             <p>
               Did you mean:{' '}
-              {suggestions.map((s,i) => (
+              {suggestions.map((s, i) => (
                 <span
                   key={i}
                   className="underline cursor-pointer"
@@ -79,14 +78,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Loop over every parse result */}
       {results.map((r, idx) => (
         <div key={idx} className="space-y-3 mb-6 border p-4 rounded">
           <p className="text-sm text-gray-600">Source: {r.source}</p>
 
           <p className="text-xl">
             {r.segments.map((seg, i) => (
-              <span key={i} className={seg.type}>
+              <span key={i} className={`segment-${seg.type}`}>
                 {seg.text}
               </span>
             ))}
