@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* src/index.css */
 
 /* Optional: Arabic font and right-to-left direction */
 body {
@@ -8,17 +6,18 @@ body {
   direction: rtl;
   background-color: #f9fafb; /* subtle light background */
 }
+
 .prefix {
-  color: #008080; /* teal */
+  color: yellow;      /* prefixes in yellow */
   font-weight: bold;
 }
 
 .root {
-  color: #8B0000; /* dark red */
+  color: black;       /* roots in black */
   font-weight: bold;
 }
 
 .suffix {
-  color: #DAA520; /* goldenrod */
+  color: blue;        /* suffixes in blue */
   font-weight: bold;
 }
