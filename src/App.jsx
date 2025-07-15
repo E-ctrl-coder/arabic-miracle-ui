@@ -3,17 +3,16 @@ import React, { useState } from 'react'
 import './index.css'
 
 export default function App() {
-  const [word, setWord]               = useState('')
-  const [results, setResults]         = useState([])
-  const [error, setError]             = useState('')
-  const [suggestions, setSuggestions] = useState([])
+  const [word, setWord]       = useState('')
+  const [results, setResults] = useState([])
+  const [error, setError]     = useState('')
 
   async function handleAnalyze() {
     setError('')
-    setSuggestions([])
     setResults([])
 
-    if (!word.trim()) {
+    const w = word.trim()
+    if (!w) {
       setError('Please enter an Arabic word')
       return
     }
@@ -22,16 +21,13 @@ export default function App() {
       const res = await fetch('/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: word.trim() })
+        body: JSON.stringify({ word: w })
       })
       const data = await res.json()
-
       if (!res.ok) {
         setError(data.error || `Server error ${res.status}`)
-        if (data.suggestions) setSuggestions(data.suggestions)
         return
       }
-
       setResults(Array.isArray(data) ? data : [data])
     } catch (e) {
       setError('Network error: ' + e.message)
@@ -58,51 +54,56 @@ export default function App() {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-4">
-          <p className="text-red-600">{error}</p>
-          {suggestions.length > 0 && (
-            <p>
-              Did you mean:{' '}
-              {suggestions.map((s, i) => (
-                <span
-                  key={i}
-                  className="underline cursor-pointer"
-                  onClick={() => setWord(s)}
-                >
-                  {s}{i < suggestions.length-1 && ', '}
+      {error && <p className="text-red-600 mb-4">{error}</p>}
+
+      {results.map((r, idx) => (
+        <div key={idx} className="mb-6 border p-4 rounded bg-white">
+          <p className="text-sm text-gray-600 mb-2">
+            المصدر: <strong>{r.source}</strong>
+          </p>
+
+          {/* Common: render segments if present */}
+          {r.segments && (
+            <p className="text-xl mb-2">
+              {r.segments.map((seg, i) => (
+                <span key={i} className={`segment-${seg.type}`}>
+                  {seg.text}
                 </span>
               ))}
             </p>
           )}
-        </div>
-      )}
 
-      {results.map((r, idx) => (
-        <div key={idx} className="space-y-3 mb-6 border p-4 rounded">
-          <p className="text-sm text-gray-600">Source: {r.source}</p>
-
-          <p className="text-xl">
-            {r.segments.map((seg, i) => (
-              <span key={i} className={`segment-${seg.type}`}>
-                {seg.text}
-              </span>
-            ))}
-          </p>
-
-          <p>الوزن (Pattern): {r.pattern}</p>
-          <p>عدد مرات الجذر في القرآن: {r.root_occurrences}</p>
-
-          {r.example_verses.length > 0 && (
+          {r.source === 'dataset' && (
             <>
-              <h4 className="mt-4">نماذج من الآيات:</h4>
-              <ol className="list-decimal list-inside">
-                {r.example_verses.map(v => (
-                  <li key={v.verseNumber}>
-                    <strong>آية {v.verseNumber}:</strong> {v.text}
-                  </li>
-                ))}
-              </ol>
+              <p>الكلمة الأصلية: {r.word}</p>
+              <p>الجذر: {r.root}</p>
+              <p>الوزن: {r.pattern}</p>
+              <p>عدد مرات الجذر: {r.root_occurrences}</p>
+
+              {r.example_verses && r.example_verses.length > 0 && (
+                <>
+                  <h4 className="mt-4">نماذج من الآيات:</h4>
+                  <ol className="list-decimal list-inside">
+                    {r.example_verses.map((v, i) => (
+                      <li key={i}>
+                        <strong>آية {v.sentence_id}:</strong> {v.text}
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
+            </>
+          )}
+
+          {r.source === 'masaq' && (
+            <>
+              <p>الكلمة (بدون تشكيل): {r.without_diacritics}</p>
+              <p>الكلمة المقسمة: {r.segmented_word}</p>
+              <p>Gloss: {r.gloss}</p>
+              <p>نوع الصرف: {r.morph_tag}</p>
+              <p>نوع الكلمة: {r.morph_type}</p>
+              <p>الدور النحوي: {r.syntax_role}</p>
+              <p>الموقع في القرآن: {r.sura}:{r.verse}</p>
             </>
           )}
         </div>
