@@ -92,7 +92,27 @@ export default function App() {
             <>
               <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
               <p><strong>الجذر:</strong> {r.root}</p>
-              <p><strong>الوزن:</strong> {r.pattern}</p>
+
+              {/* ← replace this line: */}
+              {/* <p><strong>الوزن:</strong> {r.pattern}</p> */}
+
+              {/* → with this: full pattern + affixes */}
+              <p>
+                <strong>الوزن الكامل:</strong>{' '}
+                {(() => {
+                  const pre = r.segments.find(s => s.type === 'prefix')?.text || ''
+                  const pat = r.pattern
+                  const suf = r.segments.find(s => s.type === 'suffix')?.text || ''
+                  return (
+                    <>
+                      <span className="pattern-affix">{pre}</span>
+                      <span className="pattern">{pat}</span>
+                      <span className="pattern-affix">{suf}</span>
+                    </>
+                  )
+                })()}
+              </p>
+
               <p><strong>عدد مرات الجذر:</strong> {r.root_occurrences}</p>
 
               {r.example_verses && r.example_verses.length > 0 && (
