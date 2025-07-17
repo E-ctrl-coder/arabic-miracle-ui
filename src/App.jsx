@@ -3,9 +3,12 @@ import React, { useState } from 'react'
 import './index.css'
 
 export default function App() {
-  const [word, setWord] = useState('')
+  const [word, setWord]       = useState('')
   const [results, setResults] = useState([])
-  const [error, setError] = useState('')
+  const [error, setError]     = useState('')
+
+  // Point this at your live Render URL:
+  const API_URL = 'https://arabic-miracle-api.onrender.com'
 
   async function handleAnalyze() {
     setError('')
@@ -18,7 +21,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('https://arabic-miracle-api.onrender.com/analyze', {
+      const res = await fetch(`${API_URL}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word: w })
@@ -68,36 +71,37 @@ export default function App() {
 
       {results.map((r, idx) => (
         <div key={idx} className="mb-6 border p-4 rounded bg-white">
-          {/* المصدر */}
+          {/* Source */}
           <p className="text-sm text-gray-600 mb-2">
-            <strong>المصدر:</strong> {r['المصدر']}
+            <strong>المصدر:</strong> {r.source}
           </p>
 
-          {/* Nemlar branch */}
-          {'الكلمة' in r && (
+          {/* Segments (prefix+root+suffix) */}
+          {r.segments && (
+            <p className="text-xl mb-2">
+              {r.segments.map((seg, i) => (
+                <span key={i} className={`segment-${seg.type}`}>
+                  {seg.text}
+                </span>
+              ))}
+            </p>
+          )}
+
+          {/* Nemlar block */}
+          {r.source === 'dataset' && (
             <>
-              <p><strong>الكلمة:</strong> {r['الكلمة']}</p>
+              <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
+              <p><strong>الجذر:</strong> {r.root}</p>
+              <p><strong>الوزن:</strong> {r.pattern}</p>
+              <p><strong>عدد مرات الجذر:</strong> {r.root_occurrences}</p>
 
-              <p><strong>التقسيمات:</strong></p>
-              <p className="text-xl mb-2">
-                {(r['التقسيمات'] || []).map((seg, i) => (
-                  <span key={i} className={`segment-${seg.type}`}>
-                    {seg.text}
-                  </span>
-                ))}
-              </p>
-
-              <p><strong>الجذر:</strong> {r['الجذر']}</p>
-              <p><strong>الوزن:</strong> {r['الوزن']}</p>
-              <p><strong>عدد مرات الجذر:</strong> {r['عدد مرات الجذر']}</p>
-
-              {r['نماذج الآيات']?.length > 0 && (
+              {r.example_verses && r.example_verses.length > 0 && (
                 <>
-                  <h4 className="mt-4">نماذج الآيات:</h4>
+                  <h4 className="mt-4">نماذج من الآيات:</h4>
                   <ol className="list-decimal list-inside">
-                    {r['نماذج الآيات'].map((v, i) => (
+                    {r.example_verses.map((v, i) => (
                       <li key={i}>
-                        <strong>آية {v['معرف الجملة']}:</strong> {v['نص الآية']}
+                        <strong>آية {v.sentence_id}:</strong> {v.text}
                       </li>
                     ))}
                   </ol>
@@ -106,18 +110,15 @@ export default function App() {
             </>
           )}
 
-          {/* MASAQ branch */}
-          {'الكلمة بدون تشكيل' in r && (
+          {/* MASAQ block */}
+          {r.source === 'masaq' && (
             <>
-              <p><strong>الكلمة بدون تشكيل:</strong> {r['الكلمة بدون تشكيل']}</p>
-              <p><strong>الكلمة المقسمة:</strong> {r['الكلمة المقسمة']}</p>
-              <p><strong>المعنى:</strong> {r['المعنى']}</p>
-              <p><strong>علامة الصرف:</strong> {r['علامة الصرف']}</p>
-              <p><strong>نوع الكلمة:</strong> {r['نوع الكلمة']}</p>
-              <p><strong>الدور النحوي:</strong> {r['الدور النحوي']}</p>
+              <p><strong>المعنى:</strong> {r.gloss}</p>
+              <p><strong>علامة الصرف:</strong> {r.morph_tag}</p>
+              <p><strong>نوع الكلمة:</strong> {r.morph_type}</p>
+              <p><strong>الدور النحوي:</strong> {r.syntax_role}</p>
               <p>
-                <strong>الموقع في القرآن:</strong> 
-                آية {r['السورة']}:{r['الآية']}
+                <strong>الموقع في القرآن:</strong> {r.sura}:{r.verse}
               </p>
             </>
           )}
