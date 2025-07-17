@@ -22,3 +22,12 @@ body {
   color: blue;
   font-weight: bold;
 }
+
+/* For the full pattern + affixes rendering */
+.pattern-affix {
+  color: blue;
+}
+
+.pattern {
+  color: black;
+}
