@@ -9,7 +9,7 @@ body {
 
 /* Match the classNames your JSX emits */
 .segment-prefix {
-  color: green;
+  color: blue;
   font-weight: bold;
 }
 
