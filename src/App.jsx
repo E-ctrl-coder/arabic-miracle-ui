@@ -27,20 +27,29 @@ export default function App() {
         body: JSON.stringify({ word: w })
       })
 
-      let data
-      try {
-        data = await res.json()
-      } catch {
-        setError('Server returned invalid JSON')
-        return
-      }
-
       if (!res.ok) {
-        setError(data.error || `Server error ${res.status}`)
+        // try to extract error message
+        const err = await res.json().catch(() => ({}))
+        setError(err.error || `Server error ${res.status}`)
         return
       }
 
-      setResults(Array.isArray(data) ? data : [data])
+      const data = await res.json()
+
+      // If the response has { dataset, qac }, merge them
+      let merged = []
+      if (data.dataset !== undefined && data.qac !== undefined) {
+        merged = [...data.dataset, ...data.qac]
+        // if there's a suggestion, show it as error text
+        if (data.suggestion) {
+          setError(data.suggestion)
+        }
+      } else {
+        // fallback for old single-array responses
+        merged = Array.isArray(data) ? data : [data]
+      }
+
+      setResults(merged)
 
     } catch (e) {
       setError('Network error: ' + e.message)
@@ -71,12 +80,13 @@ export default function App() {
 
       {results.map((r, idx) => (
         <div key={idx} className="mb-6 border p-4 rounded bg-white">
+
           {/* Source */}
           <p className="text-sm text-gray-600 mb-2">
             <strong>المصدر:</strong> {r.source}
           </p>
 
-          {/* Segments (prefix+root+suffix) */}
+          {/* Segments */}
           {r.segments && (
             <p className="text-xl mb-2">
               {r.segments.map((seg, i) => (
@@ -87,16 +97,12 @@ export default function App() {
             </p>
           )}
 
-          {/* Nemlar block */}
+          {/* Nemlar (dataset) block */}
           {r.source === 'dataset' && (
             <>
               <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
               <p><strong>الجذر:</strong> {r.root}</p>
 
-              {/* ← replace this line: */}
-              {/* <p><strong>الوزن:</strong> {r.pattern}</p> */}
-
-              {/* → with this: full pattern + affixes */}
               <p>
                 <strong>الوزن الكامل:</strong>{' '}
                 {(() => {
@@ -115,11 +121,11 @@ export default function App() {
 
               <p><strong>عدد مرات الجذر:</strong> {r.root_occurrences}</p>
 
-              {r.example_verses && r.example_verses.length > 0 && (
+              {r.example_verses?.length > 0 && (
                 <>
                   <h4 className="mt-4">نماذج من الآيات:</h4>
                   <ol className="list-decimal list-inside">
-                    {r.example_verses.map((v, i) => (
+                    {r.example_verses.map((v,i) => (
                       <li key={i}>
                         <strong>آية {v.sentence_id}:</strong> {v.text}
                       </li>
@@ -130,7 +136,7 @@ export default function App() {
             </>
           )}
 
-          {/* MASAQ block */}
+          {/* MASAQ block (unchanged) */}
           {r.source === 'masaq' && (
             <>
               <p><strong>المعنى:</strong> {r.gloss}</p>
@@ -142,6 +148,20 @@ export default function App() {
               </p>
             </>
           )}
+
+          {/* QAC block */}
+          {r.source === 'qac' && (
+            <>
+              <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
+              <p><strong>POS:</strong> {r.pos}</p>
+              <p><strong>Lemma:</strong> {r.lemma}</p>
+              <p><strong>الجذر:</strong> {r.root}</p>
+              <p>
+                <strong>الموقع:</strong> سورة {r.sura}، آية {r.verse}
+              </p>
+            </>
+          )}
+
         </div>
       ))}
     </div>
