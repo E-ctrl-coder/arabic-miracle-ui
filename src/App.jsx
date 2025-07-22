@@ -46,14 +46,19 @@ export default function App() {
 
       // Your existing merge logic remains untouched
       let merged = []
+
       if (data.dataset !== undefined && data.qac !== undefined) {
         const dataset = data.dataset
         const qac     = data.qac
 
-        // 3️⃣ Build rootMap once from the Nemlar dataset
-        if (!rootMap) {
-          setRootMap(buildRootMap(dataset))
+        // ─── Change starts here ───
+        // Use a local copy so we can build & use rootMap immediately
+        let localRootMap = rootMap
+        if (!localRootMap) {
+          localRootMap = buildRootMap(dataset)
+          setRootMap(localRootMap)
         }
+        // ─── Change ends here ───
 
         merged = [...dataset, ...qac]
 
@@ -62,11 +67,12 @@ export default function App() {
           Array.isArray(qac) &&
           qac.length === 0 &&
           window.ENABLE_FALLBACK_MATCHER === 'true' &&
-          rootMap
+          localRootMap
         ) {
           console.warn('⚠️ Fallback QAC via Nemlar root for:', w)
-          const fallbackEntries = fallbackByRoot(w, rootMap)
+          const fallbackEntries = fallbackByRoot(w, localRootMap)
             .map(entry => ({ ...entry, source: 'fallback' }))
+
           merged = [...dataset, ...fallbackEntries]
         }
 
@@ -156,7 +162,7 @@ export default function App() {
                 <>
                   <h4 className="mt-4">نماذج من الآيات:</h4>
                   <ol className="list-decimal list-inside">
-                    {r.example_verses.map((v,i) => (
+                    {r.example_verses.map((v, i) => (
                       <li key={i}>
                         <strong>آية {v.sentence_id}:</strong> {v.text}
                       </li>
