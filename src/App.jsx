@@ -1,10 +1,9 @@
 // src/App.jsx
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import './index.css'
 
-// ← IMPORT your fallback utils
+// 1️⃣ Import your new utils
 import {
-  cleanSurface,
   buildRootMap,
   fallbackByRoot
 } from './utils/fallbackMatcher'
@@ -13,28 +12,12 @@ export default function App() {
   const [word, setWord]       = useState('')
   const [results, setResults] = useState([])
   const [error, setError]     = useState('')
+
+  // 2️⃣ Hold a map from root→[Nemlar entries]
   const [rootMap, setRootMap] = useState(null)
 
   // Point this at your live Render URL:
   const API_URL = 'https://arabic-miracle-api.onrender.com'
-
-  // Build a rootMap from the initial dataset once per session
-  useEffect(() => {
-    async function initRootMap() {
-      // fetch only Nemlar dataset (same data your API returns under dataset)
-      const resp = await fetch(`${API_URL}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: '__INIT__' })
-      })
-      const data = await resp.json()
-      const nemlarEntries = Array.isArray(data.dataset)
-        ? data.dataset
-        : []
-      setRootMap(buildRootMap(nemlarEntries))
-    }
-    initRootMap().catch(console.error)
-  }, [])
 
   async function handleAnalyze() {
     setError('')
@@ -46,7 +29,6 @@ export default function App() {
       return
     }
 
-    let merged = []
     try {
       const res = await fetch(`${API_URL}/analyze`, {
         method: 'POST',
@@ -61,34 +43,45 @@ export default function App() {
       }
 
       const data = await res.json()
-      const dataset = data.dataset || []
-      const qac     = data.qac     || []
 
-      // 1️⃣ Merge the two arrays by default
-      merged = [...dataset, ...qac]
+      // Your existing merge logic remains untouched
+      let merged = []
+      if (data.dataset !== undefined && data.qac !== undefined) {
+        const dataset = data.dataset
+        const qac     = data.qac
 
-      // 2️⃣ If QAC missed and fallback enabled, patch in root-based entries
-      if (
-        Array.isArray(qac) &&
-        qac.length === 0 &&
-        window.ENABLE_FALLBACK_MATCHER === 'true' &&
-        rootMap
-      ) {
-        console.warn('⚠️ Fallback QAC via Nemlar root for:', w)
+        // 3️⃣ Build rootMap once from the Nemlar dataset
+        if (!rootMap) {
+          setRootMap(buildRootMap(dataset))
+        }
 
-        const fallbackEntries = fallbackByRoot(w, rootMap)
-          // tag them so you can style differently if you want
-          .map(entry => ({ ...entry, source: 'fallback' }))
+        merged = [...dataset, ...qac]
 
-        merged = [...dataset, ...fallbackEntries]
-      }
+        // 4️⃣ Only if QAC was empty AND flag is "true" AND we have a rootMap
+        if (
+          Array.isArray(qac) &&
+          qac.length === 0 &&
+          window.ENABLE_FALLBACK_MATCHER === 'true' &&
+          rootMap
+        ) {
+          console.warn('⚠️ Fallback QAC via Nemlar root for:', w)
+          const fallbackEntries = fallbackByRoot(w, rootMap)
+            .map(entry => ({ ...entry, source: 'fallback' }))
+          merged = [...dataset, ...fallbackEntries]
+        }
 
-      // 3️⃣ Any suggestion from the API?
-      if (data.suggestion) {
-        setError(data.suggestion)
+        // suggestion unchanged
+        if (data.suggestion) {
+          setError(data.suggestion)
+        }
+
+      } else {
+        // fallback for old single-array responses
+        merged = Array.isArray(data) ? data : [data]
       }
 
       setResults(merged)
+
     } catch (e) {
       setError('Network error: ' + e.message)
     }
@@ -135,35 +128,78 @@ export default function App() {
             </p>
           )}
 
-          {/* dataset block */}
+          {/* Nemlar (dataset) block */}
           {r.source === 'dataset' && (
             <>
               <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
               <p><strong>الجذر:</strong> {r.root}</p>
-              {/* ...rest unchanged */}
+
+              <p>
+                <strong>الوزن الكامل:</strong>{' '}
+                {(() => {
+                  const pre = r.segments.find(s => s.type === 'prefix')?.text || ''
+                  const pat = r.pattern
+                  const suf = r.segments.find(s => s.type === 'suffix')?.text || ''
+                  return (
+                    <>
+                      <span className="pattern-affix">{pre}</span>
+                      <span className="pattern">{pat}</span>
+                      <span className="pattern-affix">{suf}</span>
+                    </>
+                  )
+                })()}
+              </p>
+
+              <p><strong>عدد مرات الجذر:</strong> {r.root_occurrences}</p>
+
+              {r.example_verses?.length > 0 && (
+                <>
+                  <h4 className="mt-4">نماذج من الآيات:</h4>
+                  <ol className="list-decimal list-inside">
+                    {r.example_verses.map((v,i) => (
+                      <li key={i}>
+                        <strong>آية {v.sentence_id}:</strong> {v.text}
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
             </>
           )}
 
-          {/* masaq block */}
+          {/* MASAQ block (unchanged) */}
           {r.source === 'masaq' && (
             <>
-              {/* unchanged */}
+              <p><strong>المعنى:</strong> {r.gloss}</p>
+              <p><strong>علامة الصرف:</strong> {r.morph_tag}</p>
+              <p><strong>نوع الكلمة:</strong> {r.morph_type}</p>
+              <p><strong>الدور النحوي:</strong> {r.syntax_role}</p>
+              <p>
+                <strong>الموقع في القرآن:</strong> {r.sura}:{r.verse}
+              </p>
             </>
           )}
 
-          {/* qac block */}
+          {/* QAC block */}
           {r.source === 'qac' && (
             <>
-              {/* unchanged */}
+              <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
+              <p><strong>POS:</strong> {r.pos}</p>
+              <p><strong>Lemma:</strong> {r.lemma}</p>
+              <p><strong>الجذر:</strong> {r.root}</p>
+              <p>
+                <strong>الموقع:</strong> سورة {r.sura}، آية {r.verse}
+              </p>
             </>
           )}
 
-          {/* fallback block */}
+          {/* Fallback block */}
           {r.source === 'fallback' && (
             <p className="text-blue-600">
-              ⚠️ تم إيجاد تطابق احتياطي عبر جذر Nemlar: {r.root}
+              ⚠️ تطابق احتياطي عبر جذر Nemlar: {r.root}
             </p>
           )}
+
         </div>
       ))}
     </div>
