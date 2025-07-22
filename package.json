@@ -1,7 +1,12 @@
 {
   "name": "arabic-miracle-ui",
   "version": "1.0.0",
-  "private": true,
+- "private": true,
++ "private": true,
++ "type": "module",                // ← add this line
++ "engines": {                     // ← and this block
++   "node": ">=22.16.0 <23"
++ },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
