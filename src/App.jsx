@@ -8,11 +8,10 @@ import {
 } from './utils/fallbackMatcher'
 
 export default function App() {
-  const [word, setWord]       = useState('')
+  const [word, setWord] = useState('')
   const [results, setResults] = useState([])
-  const [error, setError]     = useState('')
-
-  const [rootMap, setRootMap]     = useState(null)
+  const [error, setError] = useState('')
+  const [rootMap, setRootMap] = useState(null)
   const [corpusJSON, setCorpusJSON] = useState([])
 
   const API_URL = 'https://arabic-miracle-api.onrender.com'
@@ -26,11 +25,11 @@ export default function App() {
 
   function normalizeArabic(str) {
     return str
-      .replace(/[\u064B-\u0652\u0670\u0640]/g, '') // remove harakat, dagger alif, tatwil
-      .replace(/ٱ|أ|إ|آ/g, 'ا')                   // normalize all alif variants
-      .replace(/ﻻ|لا/g, 'لا')                     // ligature normalization
-      .replace(/\s+/g, '')                        // remove spaces
-      .replace(/[^\u0621-\u064A]/g, '')           // strip punctuation/non-Arabic
+      .replace(/[\u064B-\u0652\u0670\u0640]/g, '') // strip harakat, dagger alif, tatwil
+      .replace(/ٱ|أ|إ|آ/g, 'ا')                   // normalize alif forms
+      .replace(/ﻻ/g, 'لا')                         // ligature normalization
+      .replace(/\s+/g, '')                         // remove spaces
+      .replace(/[^\u0621-\u064A]/g, '')            // remove punctuation/non-Arabic
       .trim()
   }
 
@@ -97,12 +96,12 @@ export default function App() {
         .filter(entry => normalizeArabic(entry.word) === target)
         .map(entry => ({
           source: 'qac',
-          word:   entry.word,
-          pos:    entry.qac?.pos || '—',
-          lemma:  entry.qac?.features?.LEM || '—',
-          root:   entry.qac?.features?.ROOT || '—',
-          sura:   entry.sura,
-          verse:  entry.verse
+          word: entry.word,
+          pos: entry.qac?.pos || '—',
+          lemma: entry.qac?.features?.LEM || '—',
+          root: entry.qac?.features?.ROOT || '—',
+          sura: entry.sura,
+          verse: entry.verse
         }))
 
       merged = [...merged, ...localCorpusHits]
@@ -137,7 +136,6 @@ export default function App() {
 
       {results.map((r, idx) => (
         <div key={idx} className="mb-6 border p-4 rounded bg-white">
-
           <p className="text-sm text-gray-600 mb-2">
             <strong>المصدر:</strong> {r.source}
           </p>
