@@ -3,7 +3,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
+  // Copy all static files from public/, including our generated quran-qac.json
+  publicDir: 'public',
+
   plugins: [react()],
+  
   server: {
     proxy: {
       '/api': {
@@ -12,5 +16,10 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+
+  build: {
+    // Make sure .json files in public/ are treated as assets to copy to dist/
+    assetsInclude: ['**/*.json']
   }
 })
