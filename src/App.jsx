@@ -1,8 +1,7 @@
 // src/App.jsx
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import './index.css'
 
-// 1️⃣ Import your new utils
 import {
   buildRootMap,
   fallbackByRoot
@@ -13,11 +12,24 @@ export default function App() {
   const [results, setResults] = useState([])
   const [error, setError]     = useState('')
 
-  // 2️⃣ Hold a map from root→[Nemlar entries]
-  const [rootMap, setRootMap] = useState(null)
+  const [rootMap, setRootMap]     = useState(null)
+  const [corpusJSON, setCorpusJSON] = useState([])
 
-  // Point this at your live Render URL:
   const API_URL = 'https://arabic-miracle-api.onrender.com'
+
+  useEffect(() => {
+    fetch('/quran-qac.json')
+      .then(r => r.json())
+      .then(setCorpusJSON)
+      .catch(e => console.warn('📛 Failed to load quran-qac.json', e))
+  }, [])
+
+  function normalizeArabic(str) {
+    return str
+      .replace(/[\u064B-\u0652\u0670]/g, '') // remove harakat + dagger alif
+      .replace(/ٱ/g, 'ا')                     // replace alif-wasla with bare alif
+      .trim()
+  }
 
   async function handleAnalyze() {
     setError('')
@@ -43,26 +55,20 @@ export default function App() {
       }
 
       const data = await res.json()
-
-      // Your existing merge logic remains untouched
       let merged = []
 
       if (data.dataset !== undefined && data.qac !== undefined) {
         const dataset = data.dataset
         const qac     = data.qac
 
-        // ─── Change starts here ───
-        // Use a local copy so we can build & use rootMap immediately
         let localRootMap = rootMap
         if (!localRootMap) {
           localRootMap = buildRootMap(dataset)
           setRootMap(localRootMap)
         }
-        // ─── Change ends here ───
 
         merged = [...dataset, ...qac]
 
-        // 4️⃣ Only if QAC was empty AND flag is "true" AND we have a rootMap
         if (
           Array.isArray(qac) &&
           qac.length === 0 &&
@@ -72,20 +78,32 @@ export default function App() {
           console.warn('⚠️ Fallback QAC via Nemlar root for:', w)
           const fallbackEntries = fallbackByRoot(w, localRootMap)
             .map(entry => ({ ...entry, source: 'fallback' }))
-
           merged = [...dataset, ...fallbackEntries]
         }
 
-        // suggestion unchanged
         if (data.suggestion) {
           setError(data.suggestion)
         }
 
       } else {
-        // fallback for old single-array responses
         merged = Array.isArray(data) ? data : [data]
       }
 
+      // 🔍 Look up QAC entries from local JSON
+      const target = normalizeArabic(w)
+      const localCorpusHits = corpusJSON
+        .filter(entry => normalizeArabic(entry.word) === target)
+        .map(entry => ({
+          source: 'qac',
+          word:   entry.word,
+          pos:    entry.qac?.pos || '—',
+          lemma:  entry.qac?.features?.LEM || '—',
+          root:   entry.qac?.features?.ROOT || '—',
+          sura:   entry.sura,
+          verse:  entry.verse
+        }))
+
+      merged = [...merged, ...localCorpusHits]
       setResults(merged)
 
     } catch (e) {
@@ -118,12 +136,10 @@ export default function App() {
       {results.map((r, idx) => (
         <div key={idx} className="mb-6 border p-4 rounded bg-white">
 
-          {/* Source */}
           <p className="text-sm text-gray-600 mb-2">
             <strong>المصدر:</strong> {r.source}
           </p>
 
-          {/* Segments */}
           {r.segments && (
             <p className="text-xl mb-2">
               {r.segments.map((seg, i) => (
@@ -134,7 +150,6 @@ export default function App() {
             </p>
           )}
 
-          {/* Nemlar (dataset) block */}
           {r.source === 'dataset' && (
             <>
               <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
@@ -173,7 +188,6 @@ export default function App() {
             </>
           )}
 
-          {/* MASAQ block (unchanged) */}
           {r.source === 'masaq' && (
             <>
               <p><strong>المعنى:</strong> {r.gloss}</p>
@@ -186,7 +200,6 @@ export default function App() {
             </>
           )}
 
-          {/* QAC block */}
           {r.source === 'qac' && (
             <>
               <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
@@ -199,13 +212,11 @@ export default function App() {
             </>
           )}
 
-          {/* Fallback block */}
           {r.source === 'fallback' && (
             <p className="text-blue-600">
               ⚠️ تطابق احتياطي عبر جذر Nemlar: {r.root}
             </p>
           )}
-
         </div>
       ))}
     </div>
