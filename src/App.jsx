@@ -26,8 +26,11 @@ export default function App() {
 
   function normalizeArabic(str) {
     return str
-      .replace(/[\u064B-\u0652\u0670]/g, '') // remove harakat + dagger alif
-      .replace(/ٱ/g, 'ا')                     // replace alif-wasla with bare alif
+      .replace(/[\u064B-\u0652\u0670\u0640]/g, '') // remove harakat, dagger alif, tatwil
+      .replace(/ٱ|أ|إ|آ/g, 'ا')                   // normalize all alif variants
+      .replace(/ﻻ|لا/g, 'لا')                     // ligature normalization
+      .replace(/\s+/g, '')                        // remove spaces
+      .replace(/[^\u0621-\u064A]/g, '')           // strip punctuation/non-Arabic
       .trim()
   }
 
@@ -89,7 +92,6 @@ export default function App() {
         merged = Array.isArray(data) ? data : [data]
       }
 
-      // 🔍 Look up QAC entries from local JSON
       const target = normalizeArabic(w)
       const localCorpusHits = corpusJSON
         .filter(entry => normalizeArabic(entry.word) === target)
