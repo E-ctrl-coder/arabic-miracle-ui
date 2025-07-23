@@ -17,7 +17,7 @@ export default function App() {
 
   const API_URL = 'https://arabic-miracle-api.onrender.com'
 
-  // Load the merged QAC JSON on startup
+  // 1) Load merged QAC JSON once at startup
   useEffect(() => {
     fetch('/quran-qac.json')
       .then(res => {
@@ -38,19 +38,20 @@ export default function App() {
       })
   }, [])
 
-  // Normalize Arabic: strip tashkīl, tatwīl, unify alifs, remove non-letters
+  // 2) Normalize Arabic input and tokens
   function normalizeArabic(str) {
     return str
-      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')  // harakat, dagger alif, tatwil
-      .replace(/ٱ|أ|إ|آ/g, 'ا')                    // all alifs → bare alif
-      .replace(/ﻻ/g, 'لا')                          // lam+alif ligature
-      .replace(/\s+/g, '')                          // no spaces
-      .replace(/[^\u0621-\u064A]/g, '')             // keep only Arabic letters
+      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')  // strip harakat, dagger alif, tatwil
+      .replace(/ٱ|أ|إ|آ/g, 'ا')                    // unify alif forms
+      .replace(/ﻻ/g, 'لا')                          // ligature
+      .replace(/\s+/g, '')                          // remove spaces
+      .replace(/[^\u0621-\u064A]/g, '')             // remove non-Arabic
       .trim()
   }
 
+  // 3) Handle “تحليل” click
   async function handleAnalyze() {
-    // If the JSON failed to load, bail out early
+    // If QAC JSON didn’t load, bail out
     if (!corpusJSON) {
       setError('تعذر تحليل QAC لأن ملف quran-qac.json لم يُحمّل.')
       return
@@ -66,7 +67,7 @@ export default function App() {
     }
 
     try {
-      // 1) Call your API (Nemlar + server-side QAC)
+      // 3a) Call your API (Nemlar + server QAC)
       const res = await fetch(`${API_URL}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,7 +83,7 @@ export default function App() {
       const data = await res.json()
       let merged = []
 
-      // 2) Merge Nemlar dataset + server QAC
+      // 3b) Merge Nemlar “dataset” + server “qac”
       if (data.dataset !== undefined && data.qac !== undefined) {
         const dataset = data.dataset
         const qac     = data.qac
@@ -114,17 +115,15 @@ export default function App() {
         }
 
       } else {
-        // if your API returns a single array or object
         merged = Array.isArray(data) ? data : [data]
       }
 
-      // 3) Lookup local QAC from quran-qac.json
+      // 3c) Now append your local QAC hits from quran-qac.json
       const targetNorm = normalizeArabic(w)
 
       const localHits = corpusJSON
         .filter(entry => {
-          // if you added word_norm in your merge script, use it;
-          // otherwise fall back to entry.word
+          // match on the normalized token: prefer precomputed word_norm
           const token = entry.word_norm || entry.word
           return normalizeArabic(token) === targetNorm
         })
@@ -146,6 +145,7 @@ export default function App() {
     }
   }
 
+  // 4) Render
   return (
     <div className="App p-8 bg-gray-50" dir="rtl">
       <h1 className="text-2xl mb-4">محلل الصرف العربي</h1>
