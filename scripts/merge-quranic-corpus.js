@@ -2,9 +2,7 @@
 import fs from 'fs'
 import path from 'path'
 
-//
 // 0) Arabic → Buckwalter converter (minimal, inline)
-//
 const bwMap = {
   'ا': 'A', 'أ': '>', 'إ': '<', 'آ': '|', 'ء': "'", 'ؤ': '&', 'ئ': '}',
   'ب': 'b', 'ت': 't', 'ث': 'v', 'ج': 'j', 'ح': 'H', 'خ': 'x', 'د': 'd',
@@ -23,14 +21,19 @@ function arabicToBuckwalter(str) {
     .join('')
 }
 
-//
+function normalizeArabic(str) {
+  return str
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, '') // harakat, dagger alif, tatwil
+    .replace(/ٱ|أ|إ|آ/g, 'ا')                   // unify alifs
+    .replace(/[^\u0621-\u064A]/g, '')           // remove punctuation
+    .trim()
+}
+
 // 1) Paths to your two files in public/
 const quranPath = path.resolve('public', 'quran.txt')
 const qacPath   = path.resolve('public', 'quranic-corpus-morphology-0.4.txt')
 
-//
 // 2) Read & sanitize lines
-//
 const quranLines = fs
   .readFileSync(quranPath, 'utf8')
   .split(/\r?\n/)
@@ -43,9 +46,7 @@ const qacLinesRaw = fs
 
 const corpusLines = qacLinesRaw.slice(1)
 
-//
 // 3) Build QAC index: sura|verse|FORM (Buckwalter) → records
-//
 const corpusIndex = new Map()
 
 for (const line of corpusLines) {
@@ -74,9 +75,7 @@ for (const line of corpusLines) {
   corpusIndex.get(key).push({ pos: tag, features })
 }
 
-//
 // 4) Walk each Qur’an token → Buckwalter → match
-//
 const merged = []
 
 for (const line of quranLines) {
@@ -88,32 +87,33 @@ for (const line of quranLines) {
   for (const token of tokens) {
     const key = `${sura}|${verse}|${arabicToBuckwalter(token)}`
     const hits = corpusIndex.get(key) || []
+    const norm = normalizeArabic(token)
 
     if (hits.length) {
       hits.forEach(hit =>
         merged.push({
           sura,
           verse,
-          word:   token,
+          word: token,
+          word_norm: norm,
           source: 'qac-corpus',
-          qac:    hit
+          qac: hit
         })
       )
     } else {
       merged.push({
         sura,
         verse,
-        word:   token,
+        word: token,
+        word_norm: norm,
         source: 'qac-corpus-missing',
-        qac:    null
+        qac: null
       })
     }
   }
 }
 
-//
 // 5) Output Arabic-enriched JSON
-//
 const outPath = path.resolve('public', 'quran-qac.json')
 fs.writeFileSync(outPath, JSON.stringify(merged, null, 2), 'utf8')
 console.log(`✅ quran-qac.json created with ${merged.length} tokens`)
