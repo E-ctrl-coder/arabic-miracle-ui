@@ -5,8 +5,8 @@ import path from 'path'
 //
 // 1) Paths to your two files in public/data/
 //
-const quranPath  = path.resolve('public/data/quran.txt')
-const qacPath    = path.resolve('public/data/qac.txt')  // make sure this matches your filename
+const quranPath = path.resolve('public/data/quran.txt')
+const qacPath   = path.resolve('public/data/qac.txt')  // ensure this matches your filename
 
 //
 // 2) Read and split
