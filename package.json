@@ -7,7 +7,7 @@
     "node": ">=22.16.0 <23"
   },
   "scripts": {
-    "prebuild": "node scripts/merge-quran-corpus.js",
+    "prebuild": "node scripts/merge-quranic-corpus.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
