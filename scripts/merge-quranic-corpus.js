@@ -3,11 +3,12 @@ import fs from 'fs'
 import path from 'path'
 
 //
-// 1) Paths to your two files in public/data/
+// 1) Paths to your two files in public/
 //
-const quranPath = path.resolve('public/data/quran.txt')
+const quranPath = path.resolve('public', 'quran.txt')
 const qacPath   = path.resolve(
-  'public/data/quranic-corpus-morphology-0.4.txt'
+  'public',
+  'quranic-corpus-morphology-0.4.txt'
 )
 
 //
@@ -21,7 +22,7 @@ const qacLines = fs.readFileSync(qacPath, 'utf-8')
   .trim()
   .split('\n')
 
-// drop the header row from the QAC TSV
+// drop the header row
 const [, ...corpusLines] = qacLines
 
 //
@@ -31,10 +32,7 @@ const corpusIndex = new Map()
 
 corpusLines.forEach(line => {
   const [loc, form, tag, feats] = line.split('\t')
-  const [sura, verse] = loc
-    .replace(/[()]/g, '')
-    .split(':')
-    .slice(0, 2)
+  const [sura, verse] = loc.replace(/[()]/g, '').split(':').slice(0, 2)
   const features = {}
   feats.split('|').forEach(part => {
     const [k, v] = part.split(':')
@@ -46,7 +44,7 @@ corpusLines.forEach(line => {
 })
 
 //
-// 4) Walk every token in every verse, merge
+// 4) Walk every token, merge
 //
 const merged = []
 
@@ -78,8 +76,8 @@ quranLines.forEach(line => {
 })
 
 //
-// 5) Write out the combined JSON
+// 5) Write quran-qac.json into public/
 //
-const outPath = path.resolve('public/data/quran-qac.json')
+const outPath = path.resolve('public', 'quran-qac.json')
 fs.writeFileSync(outPath, JSON.stringify(merged, null, 2), 'utf-8')
 console.log(`✅ quran-qac.json created with ${merged.length} tokens`)
