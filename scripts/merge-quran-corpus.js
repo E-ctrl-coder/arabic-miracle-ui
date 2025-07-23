@@ -1,4 +1,4 @@
-// scripts/merge-quran-corpus.js
+// scripts/merge-quranic-corpus.js
 import fs from 'fs'
 import path from 'path'
 
@@ -6,7 +6,9 @@ import path from 'path'
 // 1) Paths to your two files in public/data/
 //
 const quranPath = path.resolve('public/data/quran.txt')
-const qacPath   = path.resolve('public/data/qac.txt')  // ensure this matches your filename
+const qacPath   = path.resolve(
+  'public/data/quranic-corpus-morphology-0.4.txt'
+)
 
 //
 // 2) Read and split
@@ -29,7 +31,10 @@ const corpusIndex = new Map()
 
 corpusLines.forEach(line => {
   const [loc, form, tag, feats] = line.split('\t')
-  const [sura, verse] = loc.replace(/[()]/g, '').split(':').slice(0, 2)
+  const [sura, verse] = loc
+    .replace(/[()]/g, '')
+    .split(':')
+    .slice(0, 2)
   const features = {}
   feats.split('|').forEach(part => {
     const [k, v] = part.split(':')
