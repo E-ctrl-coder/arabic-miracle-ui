@@ -8,32 +8,54 @@ import {
 } from './utils/fallbackMatcher'
 
 export default function App() {
-  const [word, setWord] = useState('')
-  const [results, setResults] = useState([])
-  const [error, setError] = useState('')
-  const [rootMap, setRootMap] = useState(null)
-  const [corpusJSON, setCorpusJSON] = useState([])
+  const [word, setWord]                = useState('')
+  const [results, setResults]          = useState([])
+  const [error, setError]              = useState('')
+  const [rootMap, setRootMap]          = useState(null)
+  const [corpusJSON, setCorpusJSON]    = useState(null)
+  const [corpusLoadError, setCorpusLoadError] = useState('')
 
   const API_URL = 'https://arabic-miracle-api.onrender.com'
 
+  // Load the merged QAC JSON on startup
   useEffect(() => {
     fetch('/quran-qac.json')
-      .then(r => r.json())
-      .then(setCorpusJSON)
-      .catch(e => console.warn('📛 Failed to load quran-qac.json', e))
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then(json => {
+        if (!Array.isArray(json) || json.length === 0) {
+          throw new Error('Empty or invalid quran-qac.json')
+        }
+        setCorpusJSON(json)
+      })
+      .catch(err => {
+        console.error('❌ Failed to load quran-qac.json:', err)
+        setCorpusLoadError(
+          'ملف quran-qac.json غير موجود أو فارغ. تأكد من تشغيل سكريبت الدمج قبل البناء.'
+        )
+      })
   }, [])
 
+  // Normalize Arabic: strip tashkīl, tatwīl, unify alifs, remove non-letters
   function normalizeArabic(str) {
     return str
-      .replace(/[\u064B-\u0652\u0670\u0640]/g, '') // strip harakat, dagger alif, tatwil
-      .replace(/ٱ|أ|إ|آ/g, 'ا')                   // normalize alif forms
-      .replace(/ﻻ/g, 'لا')                         // ligature normalization
-      .replace(/\s+/g, '')                         // remove spaces
-      .replace(/[^\u0621-\u064A]/g, '')            // remove punctuation/non-Arabic
+      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')  // harakat, dagger alif, tatwil
+      .replace(/ٱ|أ|إ|آ/g, 'ا')                    // all alifs → bare alif
+      .replace(/ﻻ/g, 'لا')                          // lam+alif ligature
+      .replace(/\s+/g, '')                          // no spaces
+      .replace(/[^\u0621-\u064A]/g, '')             // keep only Arabic letters
       .trim()
   }
 
   async function handleAnalyze() {
+    // If the JSON failed to load, bail out early
+    if (!corpusJSON) {
+      setError('تعذر تحليل QAC لأن ملف quran-qac.json لم يُحمّل.')
+      return
+    }
+
     setError('')
     setResults([])
 
@@ -44,6 +66,7 @@ export default function App() {
     }
 
     try {
+      // 1) Call your API (Nemlar + server-side QAC)
       const res = await fetch(`${API_URL}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,18 +74,20 @@ export default function App() {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setError(err.error || `Server error ${res.status}`)
+        const errJson = await res.json().catch(() => ({}))
+        setError(errJson.error || `Server error ${res.status}`)
         return
       }
 
       const data = await res.json()
       let merged = []
 
+      // 2) Merge Nemlar dataset + server QAC
       if (data.dataset !== undefined && data.qac !== undefined) {
         const dataset = data.dataset
         const qac     = data.qac
 
+        // build rootMap once
         let localRootMap = rootMap
         if (!localRootMap) {
           localRootMap = buildRootMap(dataset)
@@ -71,6 +96,7 @@ export default function App() {
 
         merged = [...dataset, ...qac]
 
+        // optional fallback via root
         if (
           Array.isArray(qac) &&
           qac.length === 0 &&
@@ -79,7 +105,7 @@ export default function App() {
         ) {
           console.warn('⚠️ Fallback QAC via Nemlar root for:', w)
           const fallbackEntries = fallbackByRoot(w, localRootMap)
-            .map(entry => ({ ...entry, source: 'fallback' }))
+            .map(e => ({ ...e, source: 'fallback' }))
           merged = [...dataset, ...fallbackEntries]
         }
 
@@ -88,31 +114,31 @@ export default function App() {
         }
 
       } else {
+        // if your API returns a single array or object
         merged = Array.isArray(data) ? data : [data]
       }
 
-      const target = normalizeArabic(w)
-      console.log('🔍 Normalized target:', target)
+      // 3) Lookup local QAC from quran-qac.json
+      const targetNorm = normalizeArabic(w)
 
-corpusJSON.forEach(entry => {
-  const norm = normalizeArabic(entry.word)
-  if (norm === target) {
-    console.log('✅ QAC match found:', entry)
-  }
-})
-      const localCorpusHits = corpusJSON
-        .filter(entry => normalizeArabic(entry.word) === target)
+      const localHits = corpusJSON
+        .filter(entry => {
+          // if you added word_norm in your merge script, use it;
+          // otherwise fall back to entry.word
+          const token = entry.word_norm || entry.word
+          return normalizeArabic(token) === targetNorm
+        })
         .map(entry => ({
           source: 'qac',
-          word: entry.word,
-          pos: entry.qac?.pos || '—',
-          lemma: entry.qac?.features?.LEM || '—',
-          root: entry.qac?.features?.ROOT || '—',
-          sura: entry.sura,
-          verse: entry.verse
+          word:   entry.word,
+          pos:    entry.qac?.pos || '—',
+          lemma:  entry.qac?.features?.LEM || '—',
+          root:   entry.qac?.features?.ROOT || '—',
+          sura:   entry.sura,
+          verse:  entry.verse
         }))
 
-      merged = [...merged, ...localCorpusHits]
+      merged = [...merged, ...localHits]
       setResults(merged)
 
     } catch (e) {
@@ -123,6 +149,12 @@ corpusJSON.forEach(entry => {
   return (
     <div className="App p-8 bg-gray-50" dir="rtl">
       <h1 className="text-2xl mb-4">محلل الصرف العربي</h1>
+
+      {corpusLoadError && (
+        <div className="mb-4 p-4 bg-red-200 text-red-800 rounded">
+          {corpusLoadError}
+        </div>
+      )}
 
       <div className="flex items-center mb-4">
         <input
@@ -162,7 +194,6 @@ corpusJSON.forEach(entry => {
             <>
               <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
               <p><strong>الجذر:</strong> {r.root}</p>
-
               <p>
                 <strong>الوزن الكامل:</strong>{' '}
                 {(() => {
@@ -178,9 +209,7 @@ corpusJSON.forEach(entry => {
                   )
                 })()}
               </p>
-
               <p><strong>عدد مرات الجذر:</strong> {r.root_occurrences}</p>
-
               {r.example_verses?.length > 0 && (
                 <>
                   <h4 className="mt-4">نماذج من الآيات:</h4>
