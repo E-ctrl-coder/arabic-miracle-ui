@@ -92,6 +92,14 @@ export default function App() {
       }
 
       const target = normalizeArabic(w)
+      console.log('🔍 Normalized target:', target)
+
+corpusJSON.forEach(entry => {
+  const norm = normalizeArabic(entry.word)
+  if (norm === target) {
+    console.log('✅ QAC match found:', entry)
+  }
+})
       const localCorpusHits = corpusJSON
         .filter(entry => normalizeArabic(entry.word) === target)
         .map(entry => ({
