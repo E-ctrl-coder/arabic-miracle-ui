@@ -1,6 +1,7 @@
 // src/App.jsx
-import React, { useState, useEffect } from 'react'
-import './index.css'
+import React, { useState, useEffect } from 'react';
+import JsonCheck from './JsonCheck';
+import './index.css';
 
 import {
   buildRootMap,
@@ -155,6 +156,7 @@ export default function App() {
   // 4) Render
   return (
     <div className="App p-8 bg-gray-50" dir="rtl">
+       <JsonCheck />
       <h1 className="text-2xl mb-4">محلل الصرف العربي</h1>
 
       {corpusLoadError && (
