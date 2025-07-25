@@ -1,4 +1,15 @@
 # netlify.toml
 [build]
-  command = "npm run build"
+  command = "npm ci && npm run build"
   publish = "dist"
+
+[[redirects]]
+  from   = "/analyze"
+  to     = "https://arabic-miracle-api.onrender.com/analyze"
+  status = 200
+  force  = true
+
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
