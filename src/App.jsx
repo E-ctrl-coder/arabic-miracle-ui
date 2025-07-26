@@ -14,12 +14,25 @@ export default function App() {
   const [results, setResults]                 = useState([]);
   const [error, setError]                     = useState('');
   const [rootMap, setRootMap]                 = useState(null);
-  const [corpusJSON, setCorpusJSON]           = useState(null);
+  const [corpusIndex, setCorpusIndex]         = useState(new Map());
   const [corpusLoadError, setCorpusLoadError] = useState('');
 
   const API_URL = 'https://arabic-miracle-api.onrender.com';
 
-  // 1) load the merged QAC JSON once and run an audit
+  // 1) Normalizer
+  function normalizeArabic(str) {
+    return str
+      .normalize('NFC')
+      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')  // strip harakat & tatweel
+      .replace(/ٱ|أ|إ|آ/g, 'ا')                    // unify alifs
+      .replace(/ﻻ/g, 'لا')                          // ligature
+      .replace(/\u200C/g, '')                       // zero-width non-joiner
+      .replace(/\s+/g, '')                          // whitespace
+      .replace(/[^\u0621-\u064A]/g, '')             // non-Arabic
+      .trim();
+  }
+
+  // 2) Load & index the corpus once
   useEffect(() => {
     fetch('/quran-qac.json')
       .then(res => {
@@ -31,71 +44,52 @@ export default function App() {
           throw new Error('Empty or invalid quran-qac.json');
         }
 
-        console.log('✅ Loaded corpus JSON, total tokens:', json.length);
-        setCorpusJSON(json);
+        console.log('✅ Loaded corpus JSON, total entries:', json.length);
 
-        // —— DEBUG: inspect one entry’s shape —— 
-        console.log('Corpus sample entry:', json[0]);
-        console.log('Corpus entry keys:', Object.keys(json[0]));
+        const idx = new Map();
 
-        // —— DEBUG: reconstruct & log first 10 tokens —— 
-        json.slice(0, 10).forEach((entry, i) => {
-          const reconstructed = Array.isArray(entry.segments)
-            ? entry.segments.map(s => s.text).join('')
+        json.forEach((entry, ix) => {
+          // 2a) stitch segments => raw surface
+          const raw = Array.isArray(entry.segments)
+            ? entry.segments
+                .map(s => 
+                  s.text
+                    .replace(/\u200C/g, '')  // remove zero-width
+                    .replace(/\u0640/g, '')  // remove tatweel
+                )
+                .join('')
             : '';
-          console.log(`🔍 [${i}] reconstructed token:`, reconstructed);
+
+          // 2b) normalize
+          const key = normalizeArabic(raw);
+          if (!key) return;
+
+          // 2c) push into map
+          const bucket = idx.get(key) || [];
+          bucket.push({ ...entry, _surface: raw });
+          idx.set(key, bucket);
         });
 
-        // —— AUDIT: check presence of "بسم" —— 
-        const normalizeArabic = str =>
-          str
-            .normalize('NFC')
-            .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
-            .replace(/ٱ|أ|إ|آ/g, 'ا')
-            .replace(/ﻻ/g, 'لا')
-            .replace(/\u200C/g, '')
-            .replace(/\s+/g, '')
-            .replace(/[^\u0621-\u064A]/g, '')
-            .trim();
+        // DEBUG: inspect a few keys
+        console.log('🔑 Sample normalized keys:', Array.from(idx.keys()).slice(0, 10));
+        // DEBUG: confirm بسم is in the index
+        console.log('🔍 "بسم" in index?', idx.has(normalizeArabic('بسم')));
+        if (idx.has(normalizeArabic('بسم'))) {
+          console.log('🔢 Hits for بسم:', idx.get(normalizeArabic('بسم')).length);
+        }
 
-        const targetNorm = normalizeArabic('بسم');
-        const matchCount = json.filter(entry => {
-          const surfaceText = Array.isArray(entry.segments)
-            ? entry.segments.map(s => s.text).join('')
-            : '';
-          return normalizeArabic(surfaceText) === targetNorm;
-        }).length;
-
-        console.log('🔢 Matches for "بسم":', matchCount);
+        setCorpusIndex(idx);
       })
       .catch(err => {
-        console.error('❌ Failed to load quran-qac.json:', err);
+        console.error('❌ Failed to load corpus:', err);
         setCorpusLoadError(
           'ملف quran-qac.json غير موجود أو فارغ. تأكد من تشغيل سكريبت الدمج قبل البناء.'
         );
       });
   }, []);
 
-  // 2) normalize Arabic for matching
-  function normalizeArabic(str) {
-    return str
-      .normalize('NFC')
-      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
-      .replace(/ٱ|أ|إ|آ/g, 'ا')
-      .replace(/ﻻ/g, 'لا')
-      .replace(/\u200C/g, '')
-      .replace(/\s+/g, '')
-      .replace(/[^\u0621-\u064A]/g, '')
-      .trim();
-  }
-
   // 3) on “تحليل”
   async function handleAnalyze() {
-    if (!corpusJSON) {
-      setError('تعذر تحليل QAC لأن ملف quran-qac.json لم يُحمّل.');
-      return;
-    }
-
     setError('');
     setResults([]);
 
@@ -105,84 +99,68 @@ export default function App() {
       return;
     }
 
-    try {
-      // 3a) call API for Nemlar+server QAC
-      const res = await fetch(`${API_URL}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: w })
-      });
+    const target = normalizeArabic(w);
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        setError(errJson.error || `Server error ${res.status}`);
-        return;
+    // 3a) local index lookup
+    const localBucket = corpusIndex.get(target) || [];
+    let merged = [];
+
+    if (localBucket.length) {
+      console.log(`🏷 Found ${localBucket.length} local hits for "${w}"`);
+      merged = localBucket.map(entry => ({
+        source: 'qac',
+        word:   entry._surface,
+        pos:    entry.pos     || '—',
+        lemma:  entry.features?.LEM  || '—',
+        root:   entry.features?.ROOT || '—',
+        sura:   entry.sura,
+        verse:  entry.aya
+      }));
+    } else {
+      console.warn(`⚠️ No local hits for "${w}", falling back to API...`);
+      try {
+        const res = await fetch(`${API_URL}/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: w })
+        });
+
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          setError(errJson.error || `Server error ${res.status}`);
+          return;
+        }
+
+        const data = await res.json();
+        // merge dataset + server QAC
+        if (data.dataset !== undefined && data.qac !== undefined) {
+          const ds = data.dataset;
+          const qac = data.qac;
+          let localRm = rootMap;
+          if (!localRm) {
+            localRm = buildRootMap(ds);
+            setRootMap(localRm);
+          }
+          merged = [...ds, ...qac];
+          if (
+            Array.isArray(qac) && qac.length === 0 &&
+            window.ENABLE_FALLBACK_MATCHER === 'true' &&
+            localRm
+          ) {
+            const fb = fallbackByRoot(w, localRm)
+              .map(e => ({ ...e, source: 'fallback' }));
+            merged = [...ds, ...fb];
+          }
+          if (data.suggestion) setError(data.suggestion);
+        } else {
+          merged = Array.isArray(data) ? data : [data];
+        }
+      } catch (e) {
+        setError('Network error: ' + e.message);
       }
-
-      const data = await res.json();
-      let merged = [];
-
-      // 3b) merge dataset + server qac
-      if (data.dataset !== undefined && data.qac !== undefined) {
-        const dataset = data.dataset;
-        const qac     = data.qac;
-
-        let localRootMap = rootMap;
-        if (!localRootMap) {
-          localRootMap = buildRootMap(dataset);
-          setRootMap(localRootMap);
-        }
-
-        merged = [...dataset, ...qac];
-
-        if (
-          Array.isArray(qac) && qac.length === 0 &&
-          window.ENABLE_FALLBACK_MATCHER === 'true' &&
-          localRootMap
-        ) {
-          console.warn('⚠️ Fallback QAC via Nemlar root for:', w);
-          const fallbackEntries = fallbackByRoot(w, localRootMap)
-            .map(e => ({ ...e, source: 'fallback' }));
-          merged = [...dataset, ...fallbackEntries];
-        }
-
-        if (data.suggestion) {
-          setError(data.suggestion);
-        }
-      } else {
-        merged = Array.isArray(data) ? data : [data];
-      }
-
-      // 3c) now our local QAC hits
-      const targetNorm = normalizeArabic(w);
-      console.log('📊 Corpus size:', corpusJSON.length);
-      console.log('🔍 Looking for normalized token:', targetNorm);
-
-      const localHits = corpusJSON
-        .map(entry => {
-          const surfaceText = Array.isArray(entry.segments)
-            ? entry.segments.map(s => s.text).join('')
-            : '';
-          return { ...entry, surfaceText };
-        })
-        .filter(entry => normalizeArabic(entry.surfaceText) === targetNorm)
-        .map(entry => ({
-          source: 'qac',
-          word:   entry.surfaceText,
-          pos:    entry.pos    || '—',
-          lemma:  entry.features?.LEM  || '—',
-          root:   entry.features?.ROOT || '—',
-          sura:   entry.sura,
-          verse:  entry.aya
-        }));
-
-      console.log('🔢 localHits count:', localHits.length);
-      merged = [...merged, ...localHits];
-
-      setResults(merged);
-    } catch (e) {
-      setError('Network error: ' + e.message);
     }
+
+    setResults(merged);
   }
 
   // 4) render
@@ -190,7 +168,7 @@ export default function App() {
     <div className="App p-8 bg-gray-50" dir="rtl">
       <JsonCheck />
 
-      <h1 className="text-2xl mb-4">محلل الصرف العربي</h1>
+      <h1 className="text-2xl mb-4">محل الصرف العربي</h1>
 
       {corpusLoadError && (
         <div className="mb-4 p-4 bg-red-200 text-red-800 rounded">
@@ -222,19 +200,6 @@ export default function App() {
             <strong>المصدر:</strong> {r.source}
           </p>
 
-          {r.segments && (
-            <p className="text-xl mb-2">
-              {r.segments.map((seg, i) => (
-                <span key={i} className={`segment-${seg.type}`}>
-                  {seg.text}
-                </span>
-              ))}
-            </p>
-          )}
-
-          {r.source === 'dataset' && <>/* …dataset UI… */</>}
-          {r.source === 'masaq'   && <>/* …masaq UI…   */</>}
-
           {r.source === 'qac' && (
             <>
               <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
@@ -245,6 +210,8 @@ export default function App() {
             </>
           )}
 
+          {r.source === 'dataset' && <>/* …dataset UI… */</>}
+          {r.source === 'masaq'   && <>/* …masaq UI… */</>}
           {r.source === 'fallback' && (
             <p className="text-blue-600">
               ⚠️ تطابق احتياطي عبر جذر Nemlar: {r.root}
