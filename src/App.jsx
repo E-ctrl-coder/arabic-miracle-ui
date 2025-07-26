@@ -31,6 +31,11 @@ export default function App() {
           throw new Error('Empty or invalid quran-qac.json');
         }
         console.log('✅ Loaded corpus JSON, total tokens:', json.length);
+
+        // —— DEBUG: inspect one entry’s shape —— 
+        console.log('Corpus sample entry:', json[0]);
+        console.log('Corpus entry keys:', Object.keys(json[0]));
+
         setCorpusJSON(json);
       })
       .catch(err => {
@@ -123,21 +128,30 @@ export default function App() {
       console.log('📊 Corpus size:', corpusJSON.length);
       console.log('🔍 Looking for normalized token:', targetNorm);
 
+      // — CHANGED BLOCK START —
       const localHits = corpusJSON
+        .map(entry => {
+          // If there's no `surface`, stitch together any `segments` you do have
+          const surfaceText = entry.surface
+            || (Array.isArray(entry.segments)
+                ? entry.segments.map(seg => seg.text).join('')
+                : '');
+          return { ...entry, surfaceText };
+        })
         .filter(entry => {
-          // normalize the surface text of each segment
-          const tokNorm = normalizeArabic(entry.surface || '');
+          const tokNorm = normalizeArabic(entry.surfaceText);
           return tokNorm === targetNorm;
         })
         .map(entry => ({
           source: 'qac',
-          word:   entry.surface,               // use the actual token text
-          pos:    entry.pos    || '—',         // top-level pos field
-          lemma:  entry.features.LEM  || '—',  // top-level features object
-          root:   entry.features.ROOT || '—',
+          word:   entry.surfaceText,
+          pos:    entry.pos    || '—',
+          lemma:  entry.features?.LEM  || '—',
+          root:   entry.features?.ROOT || '—',
           sura:   entry.sura,
           verse:  entry.aya
         }));
+      // — CHANGED BLOCK END —
 
       console.log('🔢 localHits count:', localHits.length);
       merged = [...merged, ...localHits];
