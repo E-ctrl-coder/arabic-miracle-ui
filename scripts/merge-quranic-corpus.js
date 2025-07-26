@@ -4,17 +4,19 @@ import fs from 'fs'
 import path from 'path'
 
 /**
- * Read a text file and auto-decode BOM’d UTF-16LE or UTF-8 (or plain UTF-8)
+ * Read a text file and auto-decode BOM’d UTF-16LE or UTF-8
  */
 function readTextFile(fp) {
   const buf = fs.readFileSync(fp)
-  // UTF‐16LE BOM: 0xFF 0xFE
+  // UTF-16LE BOM: 0xFF 0xFE
   if (buf[0] === 0xFF && buf[1] === 0xFE) {
-    return buf.toString('utf16le')
+    console.log(`↳ Detected UTF-16LE BOM in ${path.basename(fp)}`)
+    return buf.toString('utf16le').replace(/^\uFEFF/, '')
   }
-  // UTF‐8 BOM: 0xEF 0xBB 0xBF
+  // UTF-8 BOM: 0xEF 0xBB 0xBF
   if (buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) {
-    return buf.toString('utf8').slice(1)
+    console.log(`↳ Detected UTF-8 BOM in ${path.basename(fp)}`)
+    return buf.toString('utf8').replace(/^\uFEFF/, '')
   }
   // default to UTF-8
   return buf.toString('utf8')
@@ -25,11 +27,11 @@ function readTextFile(fp) {
  */
 const bwMap = {
   'ا': 'A', 'أ': '>', 'إ': '<', 'آ': '|', 'ء': "'", 'ؤ': '&', 'ئ': '}',
-  'ب': 'b', 'ت': 't', 'ث': 'v', 'ج': 'j', 'ح': 'H', 'خ': 'x', 'د': 'd',
-  'ذ': '*', 'ر': 'r', 'ز': 'z', 'س': 's', 'ش': '$', 'ص': 'S', 'ض': 'D',
-  'ط': 'T', 'ظ': 'Z', 'ع': 'E', 'غ': 'g', 'ف': 'f', 'ق': 'q', 'ك': 'k',
-  'ل': 'l', 'م': 'm', 'ن': 'n', 'ه': 'h', 'و': 'w', 'ي': 'y',
-  'ى': 'Y', 'ة': 'p', 'ٱ': 'A',
+  'ب': 'b', 'ت': 't', 'ث': 'v', 'ج': 'j', 'ح': 'H', 'خ': 'x',
+  'د': 'd', 'ذ': '*', 'ر': 'r', 'ز': 'z', 'س': 's', 'ش': '$',
+  'ص': 'S', 'ض': 'D', 'ط': 'T', 'ظ': 'Z', 'ع': 'E', 'غ': 'g',
+  'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n',
+  'ه': 'h', 'و': 'w', 'ي': 'y', 'ى': 'Y', 'ة': 'p', 'ٱ': 'A',
   'ً': 'F', 'ٌ': 'N', 'ٍ': 'K', 'َ': 'a', 'ُ': 'u', 'ِ': 'i',
   'ّ': '~', 'ْ': 'o', 'ٰ': '`'
 }
@@ -39,10 +41,7 @@ function arabicToBuckwalter(str) {
     .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
     .replace(/ٱ|أ|إ|آ/g, 'ا')
     .replace(/\s+/g, '')
-  return clean
-    .split('')
-    .map(ch => bwMap[ch] || ch)
-    .join('')
+  return clean.split('').map(ch => bwMap[ch] || ch).join('')
 }
 
 function normalizeArabic(str) {
@@ -54,25 +53,36 @@ function normalizeArabic(str) {
 }
 
 async function main() {
-  // 1) Paths to your source texts and output JSON
-  const quranPath = path.resolve('public', 'quran.txt')
-  const qacPath   = path.resolve('public', 'quranic-corpus-morphology-0.4.txt')
-  const outPath   = path.resolve('public', 'quran-qac.json')
+  // 1) Paths
+  const publicDir = path.resolve(process.cwd(), 'public')
+  const quranPath = path.join(publicDir, 'quran.txt')
+  const qacPath   = path.join(publicDir, 'quranic-corpus-morphology-0.4.txt')
+  const outPath   = path.join(publicDir, 'quran-qac.json')
 
   if (!fs.existsSync(quranPath) || !fs.existsSync(qacPath)) {
     console.error('❌ Missing public/quran.txt or public/quranic-corpus-morphology-0.4.txt')
     process.exit(1)
   }
 
-  // 2) Read & split lines (auto-decode BOM/encoding)
+  // 2) Read & split lines
   const quranText  = readTextFile(quranPath)
-  const quranLines = quranText.trim().split(/\r?\n/).filter(l => l)
+  const quranLines = quranText
+    .trim()
+    .split(/\r?\n/)
+    .filter(l => !!l)
+
   console.log('❓ verses read from quran.txt:', quranLines.length)
+  if (quranLines.length !== 6236) {
+    console.warn(
+      `⚠️ Expected 6236 verses but got ${quranLines.length}. ` +
+      `Check encoding or line endings in quran.txt.`
+    )
+  }
 
   const qacText     = readTextFile(qacPath)
-  const qacLinesRaw = qacText.trim().split(/\r?\n/).filter(l => l)
-  const startIdx    = qacLinesRaw[0].startsWith('sura') ? 1 : 0
-  const corpusLines = qacLinesRaw.slice(startIdx)
+  const qacLinesRaw = qacText.trim().split(/\r?\n/).filter(l => !!l)
+  const headerLines = qacLinesRaw[0].startsWith('sura') ? 1 : 0
+  const corpusLines = qacLinesRaw.slice(headerLines)
   console.log('❓ morphology lines (minus header):', corpusLines.length)
 
   // 3) Build QAC index
@@ -81,7 +91,8 @@ async function main() {
     const [locRaw, bwForm, posTag, featsRaw] = line.split('\t')
     if (!locRaw || !bwForm || !posTag) continue
 
-    const loc = locRaw.replace(/[()]/g, '')      // "1:1:2:1"
+    // locRaw is "sura:verse:wordIdx:charIdx" — we only need sura:verse:wordIdx
+    const loc = locRaw.replace(/[()]/g, '')                
     const [sura, verse, wordIdx] = loc.split(':')
     if (!sura || !verse || !wordIdx) continue
 
@@ -97,7 +108,7 @@ async function main() {
     corpusIndex.get(key).push({ pos: posTag, features })
   }
 
-  // 4) Merge each verse → tokens → lookup
+  // 4) Merge: map each Quran token to its QAC entries
   const merged = []
   for (const line of quranLines) {
     const [sura, verse, text] = line.split('|')
@@ -123,6 +134,7 @@ async function main() {
           })
         })
       } else {
+        console.warn(`⚠️ Missing QAC entry for ${sura}:${verse} token #${idx + 1} (“${token}”)`)
         merged.push({
           sura:      Number(sura),
           verse:     Number(verse),
