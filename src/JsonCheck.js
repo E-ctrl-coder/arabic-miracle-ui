@@ -12,7 +12,7 @@ export default function JsonCheck() {
         return r.json();
       })
       .then(data => {
-        // 1) Total entries (array or object keys)
+        // 1) Total entries
         const count = Array.isArray(data)
           ? data.length
           : Object.keys(data || {}).length;
@@ -39,6 +39,31 @@ export default function JsonCheck() {
           'Sample object keys:',
           sample ? Object.keys(sample) : 'none'
         );
+
+        // 4) Simple sanity checks
+        const segments = Array.isArray(data)
+          ? data
+          : Object.values(data).flat();
+
+        const malformed = [];
+        segments.forEach(seg => {
+          const { sura, aya, surface } = seg;
+
+          // catch NaN or undefined keys
+          if (!Number.isFinite(sura) || !Number.isFinite(aya)) {
+            malformed.push(`Invalid key → ${sura}|${aya}`);
+          }
+
+          // catch empty surface text
+          if (!surface || surface.toString().trim() === '') {
+            malformed.push(`Empty surface → ${sura}|${aya}`);
+          }
+        });
+
+        console.log(
+          `Sanity check: ${malformed.length} malformed segments found`
+        );
+        malformed.slice(0, 10).forEach(msg => console.warn(msg));
       })
       .catch(err => console.error('JsonCheck error:', err));
   }, []);
