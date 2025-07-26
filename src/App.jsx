@@ -124,21 +124,20 @@ export default function App() {
       console.log('🔍 Looking for normalized token:', targetNorm);
 
       const localHits = corpusJSON
-  .filter(entry => {
-    // no more entry.qac check, we look directly at pos/features
-    // normalize the surface text
-    const s = normalizeArabic(entry.surface || '');
-    return s === targetNorm;
-  })
-  .map(entry => ({
-    source: 'qac',
-    word:   entry.surface,             // your actual token text
-    pos:    entry.pos    || '—',       // top-level pos field
-    lemma:  entry.features.LEM  || '—',// top-level features object
-    root:   entry.features.ROOT || '—',
-    sura:   entry.sura,
-    verse:  entry.aya
-  }));
+        .filter(entry => {
+          // normalize the surface text of each segment
+          const tokNorm = normalizeArabic(entry.surface || '');
+          return tokNorm === targetNorm;
+        })
+        .map(entry => ({
+          source: 'qac',
+          word:   entry.surface,               // use the actual token text
+          pos:    entry.pos    || '—',         // top-level pos field
+          lemma:  entry.features.LEM  || '—',  // top-level features object
+          root:   entry.features.ROOT || '—',
+          sura:   entry.sura,
+          verse:  entry.aya
+        }));
 
       console.log('🔢 localHits count:', localHits.length);
       merged = [...merged, ...localHits];
@@ -197,8 +196,7 @@ export default function App() {
           )}
 
           {r.source === 'dataset' && <>/* …dataset UI… */</>}
-
-          {r.source === 'masaq' && <>/* …masaq UI… */</>}
+          {r.source === 'masaq'   && <>/* …masaq UI…   */</>}
 
           {r.source === 'qac' && (
             <>
