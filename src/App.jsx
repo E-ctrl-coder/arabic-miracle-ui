@@ -124,22 +124,21 @@ export default function App() {
       console.log('🔍 Looking for normalized token:', targetNorm);
 
       const localHits = corpusJSON
-        .filter(entry => {
-          if (!entry.qac) return false;  // skip if no analysis
-          const rawSurface = entry.surface;     // ← use surface
-          const tokenNorm  = normalizeArabic(rawSurface);
-          console.log(`    compare "${rawSurface}" → "${tokenNorm}" vs target "${targetNorm}"`);
-          return tokenNorm === targetNorm;
-        })
-        .map(entry => ({
-          source: 'qac',
-          word:   entry.surface,               // ← surface again
-          pos:    entry.qac.pos  || '—',
-          lemma:  entry.qac.features.LEM  || '—',
-          root:   entry.qac.features.ROOT || '—',
-          sura:   entry.sura,
-          verse:  entry.aya
-        }));
+  .filter(entry => {
+    // no more entry.qac check, we look directly at pos/features
+    // normalize the surface text
+    const s = normalizeArabic(entry.surface || '');
+    return s === targetNorm;
+  })
+  .map(entry => ({
+    source: 'qac',
+    word:   entry.surface,             // your actual token text
+    pos:    entry.pos    || '—',       // top-level pos field
+    lemma:  entry.features.LEM  || '—',// top-level features object
+    root:   entry.features.ROOT || '—',
+    sura:   entry.sura,
+    verse:  entry.aya
+  }));
 
       console.log('🔢 localHits count:', localHits.length);
       merged = [...merged, ...localHits];
