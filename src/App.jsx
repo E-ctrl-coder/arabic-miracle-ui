@@ -10,16 +10,16 @@ import {
 } from './utils/fallbackMatcher';
 
 export default function App() {
-  const [word, setWord]                      = useState('');
-  const [results, setResults]                = useState([]);
-  const [error, setError]                    = useState('');
-  const [rootMap, setRootMap]                = useState(null);
-  const [corpusJSON, setCorpusJSON]          = useState(null);
-  const [corpusLoadError, setCorpusLoadError]= useState('');
+  const [word, setWord]                       = useState('');
+  const [results, setResults]                 = useState([]);
+  const [error, setError]                     = useState('');
+  const [rootMap, setRootMap]                 = useState(null);
+  const [corpusJSON, setCorpusJSON]           = useState(null);
+  const [corpusLoadError, setCorpusLoadError] = useState('');
 
   const API_URL = 'https://arabic-miracle-api.onrender.com';
 
-  // 1) Load merged QAC JSON once at startup
+  // 1) load the merged QAC JSON once
   useEffect(() => {
     fetch('/quran-qac.json')
       .then(res => {
@@ -41,20 +41,20 @@ export default function App() {
       });
   }, []);
 
-  // 2) Normalize Arabic input and tokens
+  // 2) normalize Arabic for matching
   function normalizeArabic(str) {
     return str
-      .normalize('NFC')                             // normalize Unicode
+      .normalize('NFC')
       .replace(/[\u064B-\u0652\u0670\u0640]/g, '')  // strip harakat, dagger alif, tatwil
-      .replace(/ٱ|أ|إ|آ/g, 'ا')                     // unify alif forms
-      .replace(/ﻻ/g, 'لا')                           // ligature
-      .replace(/\u200C/g, '')                       // remove zero-width non-joiner
-      .replace(/\s+/g, '')                          // remove whitespace
-      .replace(/[^\u0621-\u064A]/g, '')             // remove non-Arabic
+      .replace(/ٱ|أ|إ|آ/g, 'ا')                    // unify alif forms
+      .replace(/ﻻ/g, 'لا')                          // ligature
+      .replace(/\u200C/g, '')                       // zero-width non-joiner
+      .replace(/\s+/g, '')                          // whitespace
+      .replace(/[^\u0621-\u064A]/g, '')             // non-Arabic
       .trim();
   }
 
-  // 3) Handle “تحليل” click
+  // 3) on “تحليل”
   async function handleAnalyze() {
     if (!corpusJSON) {
       setError('تعذر تحليل QAC لأن ملف quran-qac.json لم يُحمّل.');
@@ -71,7 +71,7 @@ export default function App() {
     }
 
     try {
-      // 3a) Call your API (Nemlar + server QAC)
+      // 3a) call API for Nemlar+server QAC
       const res = await fetch(`${API_URL}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,12 +87,11 @@ export default function App() {
       const data = await res.json();
       let merged = [];
 
-      // 3b) Merge Nemlar “dataset” + server “qac”
+      // 3b) merge dataset + server qac
       if (data.dataset !== undefined && data.qac !== undefined) {
         const dataset = data.dataset;
         const qac     = data.qac;
 
-        // build rootMap once
         let localRootMap = rootMap;
         if (!localRootMap) {
           localRootMap = buildRootMap(dataset);
@@ -101,10 +100,8 @@ export default function App() {
 
         merged = [...dataset, ...qac];
 
-        // optional fallback via root
         if (
-          Array.isArray(qac) &&
-          qac.length === 0 &&
+          Array.isArray(qac) && qac.length === 0 &&
           window.ENABLE_FALLBACK_MATCHER === 'true' &&
           localRootMap
         ) {
@@ -121,33 +118,28 @@ export default function App() {
         merged = Array.isArray(data) ? data : [data];
       }
 
-      // 3c) Now append your local QAC hits from quran-qac.json
+      // 3c) now our local QAC hits
       const targetNorm = normalizeArabic(w);
       console.log('📊 Corpus size:', corpusJSON.length);
       console.log('🔍 Looking for normalized token:', targetNorm);
 
       const localHits = corpusJSON
         .filter(entry => {
-          if (!entry.qac) return false;  // skip empty analyses
-
-          // normalize each candidate token
-          const rawToken    = entry.word_norm || entry.word;
-          const tokenNorm   = normalizeArabic(rawToken);
-          console.log(`    compare corpus "${rawToken}" → "${tokenNorm}" vs target "${targetNorm}"`);
+          if (!entry.qac) return false;  // skip if no analysis
+          const rawSurface = entry.surface;     // ← use surface
+          const tokenNorm  = normalizeArabic(rawSurface);
+          console.log(`    compare "${rawSurface}" → "${tokenNorm}" vs target "${targetNorm}"`);
           return tokenNorm === targetNorm;
         })
-        .map(entry => {
-          console.log('✅ QAC match found:', entry);
-          return {
-            source: 'qac',
-            word:   entry.word,
-            pos:    entry.qac.pos  || '—',
-            lemma:  entry.qac.features.LEM  || '—',
-            root:   entry.qac.features.ROOT || '—',
-            sura:   entry.sura,
-            verse:  entry.aya
-          };
-        });
+        .map(entry => ({
+          source: 'qac',
+          word:   entry.surface,               // ← surface again
+          pos:    entry.qac.pos  || '—',
+          lemma:  entry.qac.features.LEM  || '—',
+          root:   entry.qac.features.ROOT || '—',
+          sura:   entry.sura,
+          verse:  entry.aya
+        }));
 
       console.log('🔢 localHits count:', localHits.length);
       merged = [...merged, ...localHits];
@@ -158,7 +150,7 @@ export default function App() {
     }
   }
 
-  // 4) Render
+  // 4) render
   return (
     <div className="App p-8 bg-gray-50" dir="rtl">
       <JsonCheck />
@@ -205,17 +197,9 @@ export default function App() {
             </p>
           )}
 
-          {r.source === 'dataset' && (
-            <>
-              {/* …existing dataset block… */}
-            </>
-          )}
+          {r.source === 'dataset' && <>/* …dataset UI… */</>}
 
-          {r.source === 'masaq' && (
-            <>
-              {/* …existing masaq block… */}
-            </>
-          )}
+          {r.source === 'masaq' && <>/* …masaq UI… */</>}
 
           {r.source === 'qac' && (
             <>
@@ -223,9 +207,7 @@ export default function App() {
               <p><strong>POS:</strong> {r.pos}</p>
               <p><strong>Lemma:</strong> {r.lemma}</p>
               <p><strong>الجذر:</strong> {r.root}</p>
-              <p>
-                <strong>الموقع:</strong> سورة {r.sura}، آية {r.verse}
-              </p>
+              <p><strong>الموقع:</strong> سورة {r.sura}، آية {r.verse}</p>
             </>
           )}
 
