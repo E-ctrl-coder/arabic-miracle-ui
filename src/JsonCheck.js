@@ -12,50 +12,38 @@ export default function JsonCheck() {
         return r.json();
       })
       .then(data => {
-        // 1) Total entries
-        const count = Array.isArray(data)
-          ? data.length
-          : Object.keys(data || {}).length;
-        console.log('Total entries:', count);
-
-        // 2) Check key existence for known verses
-        const testIds = ['002056', '001001', '114001'];
-        testIds.forEach(id => {
-          const entry = Array.isArray(data)
-            ? data.find(item => item.verse === Number(id.slice(-3)))
-            : data[id];
-          console.log(`Entry for ${id}:`, entry ? 'FOUND' : 'MISSING');
-        });
-
-        // 3) Sample object shape
-        let sample;
-        if (Array.isArray(data) && data.length) {
-          sample = data[0];
-        } else if (data && typeof data === 'object') {
-          const firstKey = Object.keys(data)[0];
-          sample = data[firstKey]?.[0];
-        }
-        console.log(
-          'Sample object keys:',
-          sample ? Object.keys(sample) : 'none'
-        );
-
-        // 4) Simple sanity checks
+        // ─── flatten into segments array ────────────────────────────────────
         const segments = Array.isArray(data)
           ? data
-          : Object.values(data).flat();
+          : Object.values(data).reduce((acc, arr) => acc.concat(arr), []);
 
+        // ─── basic info ─────────────────────────────────────────────────────
+        console.log('Total segments:', segments.length);
+        console.log(
+          'Sample segment keys:',
+          segments[0] ? Object.keys(segments[0]) : 'none'
+        );
+
+        // ─── test a few known verses by sura|aya ────────────────────────────
+        const testIds = ['002056', '001001', '114001'];
+        testIds.forEach(id => {
+          const sura = parseInt(id.slice(0, 3), 10);
+          const aya = parseInt(id.slice(3), 10);
+          const found = segments.find(
+            seg => seg.sura === sura && seg.aya === aya
+          );
+          console.log(`QAC entry for ${id}:`, found ? 'FOUND' : 'MISSING');
+        });
+
+        // ─── sanity checks ──────────────────────────────────────────────────
         const malformed = [];
         segments.forEach(seg => {
           const { sura, aya, surface } = seg;
 
-          // catch NaN or undefined keys
           if (!Number.isFinite(sura) || !Number.isFinite(aya)) {
             malformed.push(`Invalid key → ${sura}|${aya}`);
           }
-
-          // catch empty surface text
-          if (!surface || surface.toString().trim() === '') {
+          if (!surface || !surface.toString().trim()) {
             malformed.push(`Empty surface → ${sura}|${aya}`);
           }
         });
