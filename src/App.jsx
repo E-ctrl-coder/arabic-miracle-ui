@@ -14,58 +14,60 @@ export default function App() {
   const [results, setResults]                 = useState([]);
   const [error, setError]                     = useState('');
   const [rootMap, setRootMap]                 = useState(null);
-  const [corpusJSON, setCorpusJSON]           = useState(null);
+  const [corpusJSON, setCorpusJSON]           = useState([]);
   const [corpusIndex, setCorpusIndex]         = useState(new Map());
   const [corpusLoadError, setCorpusLoadError] = useState('');
 
   const API_URL = 'https://arabic-miracle-api.onrender.com';
 
   // 1) Normalizer
-  function normalizeArabic(str) {
+  function normalizeArabic(str = '') {
     return str
       .normalize('NFC')
       .replace(/[\u064B-\u0652\u0670\u0640]/g, '')  // strip harakat & tatweel
       .replace(/ٱ|أ|إ|آ/g, 'ا')                    // unify alifs
-      .replace(/ﻻ/g, 'لا')                          // ligature
-      .replace(/\u200C/g, '')                       // zero-width non-joiner
+      .replace(/ﻻ/g, 'لا')                          // fix lam-alif
+      .replace(/\u200C/g, '')                       // zero-width joiner
       .replace(/\s+/g, '')                          // whitespace
       .replace(/[^\u0621-\u064A]/g, '')             // non-Arabic
       .trim();
   }
 
-  // 2) Load & index the corpus once
+  // 2) Fetch & index the merged JSON once
   useEffect(() => {
-    fetch('/quran-qac.json')
+    const url = `${process.env.PUBLIC_URL || ''}/quran-qac.json`;
+    console.log('⏳ Fetching QAC JSON from:', url);
+
+    fetch(url)
       .then(res => {
+        console.log('Fetch status:', res.status, res.url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then(json => {
-        if (!Array.isArray(json) || json.length === 0) {
-          throw new Error('Empty or invalid quran-qac.json');
+        // Our merge script writes { metadata:…, data: […] }
+        const data = Array.isArray(json.data) ? json.data : [];
+        if (!data.length) {
+          throw new Error('Empty or invalid /quran-qac.json');
         }
-        console.log('✅ Loaded corpus JSON, total entries:', json.length);
-        setCorpusJSON(json);
+        console.log('✅ Loaded corpus entries:', data.length);
+        setCorpusJSON(data);
 
-        // build a Map: normalizedSurface → [entries]
+        // Build a Map: normalizedSurface → [entry, …]
         const idx = new Map();
-        json.forEach(entry => {
-          // stitch segments → raw surface
-          const raw = Array.isArray(entry.segments)
-            ? entry.segments.map(s => s.text).join('')
-            : '';
-          const key = normalizeArabic(raw);
+        data.forEach(entry => {
+          const key = normalizeArabic(entry.surface);
           if (!key) return;
           const bucket = idx.get(key) || [];
-          bucket.push({ ...entry, _surface: raw });
+          bucket.push(entry);
           idx.set(key, bucket);
         });
 
-        // debug
-        console.log('🔑 Sample keys:', Array.from(idx.keys()).slice(0,10));
-        console.log('🔍 "بسم" in surface index?', idx.has(normalizeArabic('بسم')));
+        // Debug
+        console.log('🔑 Sample surfaces:', Array.from(idx.keys()).slice(0,10));
+        console.log('🔍 "بسم" indexed?', idx.has(normalizeArabic('بسم')));
         if (idx.has(normalizeArabic('بسم'))) {
-          console.log('🔢 surface-hits for بسم:', idx.get(normalizeArabic('بسم')).length);
+          console.log('🔢 hits for "بسم":', idx.get(normalizeArabic('بسم')).length);
         }
 
         setCorpusIndex(idx);
@@ -73,12 +75,12 @@ export default function App() {
       .catch(err => {
         console.error('❌ Failed to load corpus:', err);
         setCorpusLoadError(
-          'ملف quran-qac.json غير موجود أو فارغ. تأكد من تشغيل سكريبت الدمج قبل البناء.'
+          'تعذر تحميل بيانات الصرف. تأكد من تشغيل سكريبت الدمج قبل البناء.'
         );
       });
   }, []);
 
-  // 3) on “تحليل”
+  // 3) On “تحليل”
   async function handleAnalyze() {
     setError('');
     setResults([]);
@@ -88,68 +90,68 @@ export default function App() {
       setError('Please enter an Arabic word');
       return;
     }
-    if (!corpusJSON) {
-      setError('تعذر تحليل QAC لأن ملف quran-qac.json لم يُحمّل.');
+    if (!corpusJSON.length) {
+      setError('لم يتم تحميل بيانات الصرف بعد.');
       return;
     }
 
     const target = normalizeArabic(w);
     let merged = [];
 
-    // 3a) surface-form lookup
+    // 3a) Surface-level hits
     const surfaceHits = corpusIndex.get(target) || [];
     if (surfaceHits.length) {
       console.log(`🏷 surface-hits for "${w}":`, surfaceHits.length);
-      merged = surfaceHits.map(entry => ({
+      merged = surfaceHits.map(e => ({
         source: 'qac',
-        word:   entry._surface,
-        pos:    entry.pos     || '—',
-        lemma:  entry.features?.LEM  || '—',
-        root:   entry.features?.ROOT || '—',
-        sura:   entry.sura,
-        verse:  entry.aya
+        word:   e.surface,
+        pos:    e.pos   || '—',
+        lemma:  e.features?.LEM  || '—',
+        root:   e.features?.ROOT || '—',
+        sura:   e.sura,
+        verse:  e.aya
       }));
     }
 
-    // 3b) lemma fallback
+    // 3b) Lemma fallback
     if (!merged.length) {
       const lemmaHits = corpusJSON.filter(e =>
         normalizeArabic(e.features?.LEM || '') === target
       );
       if (lemmaHits.length) {
         console.log(`🏷 lemma-hits for "${w}":`, lemmaHits.length);
-        merged = lemmaHits.map(entry => ({
+        merged = lemmaHits.map(e => ({
           source: 'qac-lemma',
-          word:   entry.segments.map(s => s.text).join(''),
-          pos:    entry.pos     || '—',
-          lemma:  entry.features?.LEM  || '—',
-          root:   entry.features?.ROOT || '—',
-          sura:   entry.sura,
-          verse:  entry.aya
+          word:   e.surface,
+          pos:    e.pos   || '—',
+          lemma:  e.features?.LEM  || '—',
+          root:   e.features?.ROOT || '—',
+          sura:   e.sura,
+          verse:  e.aya
         }));
       }
     }
 
-    // 3c) root fallback
+    // 3c) Root fallback
     if (!merged.length) {
       const rootHits = corpusJSON.filter(e =>
         normalizeArabic(e.features?.ROOT || '') === target
       );
       if (rootHits.length) {
         console.log(`🏷 root-hits for "${w}":`, rootHits.length);
-        merged = rootHits.map(entry => ({
+        merged = rootHits.map(e => ({
           source: 'qac-root',
-          word:   entry.segments.map(s => s.text).join(''),
-          pos:    entry.pos     || '—',
-          lemma:  entry.features?.LEM  || '—',
-          root:   entry.features?.ROOT || '—',
-          sura:   entry.sura,
-          verse:  entry.aya
+          word:   e.surface,
+          pos:    e.pos   || '—',
+          lemma:  e.features?.LEM  || '—',
+          root:   e.features?.ROOT || '—',
+          sura:   e.sura,
+          verse:  e.aya
         }));
       }
     }
 
-    // 3d) final API fallback if still empty
+    // 3d) Final fallback: your API
     if (!merged.length) {
       console.warn(`⚠️ No local QAC hits for "${w}", querying API…`);
       try {
@@ -164,7 +166,7 @@ export default function App() {
           return;
         }
         const data = await res.json();
-        // merge Nemlar + server QAC
+        // Merge Nemlar + server QAC as before
         if (data.dataset !== undefined && data.qac !== undefined) {
           const ds = data.dataset, qc = data.qac;
           let rm = rootMap;
@@ -189,7 +191,7 @@ export default function App() {
     setResults(merged);
   }
 
-  // 4) render
+  // 4) Render
   return (
     <div className="App p-8 bg-gray-50" dir="rtl">
       <JsonCheck />
@@ -225,24 +227,13 @@ export default function App() {
           <p className="text-sm text-gray-600 mb-2">
             <strong>المصدر:</strong> {r.source}
           </p>
-
-          {r.source.startsWith('qac') && (
-            <>
-              <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
-              <p><strong>POS:</strong> {r.pos}</p>
-              <p><strong>Lemma:</strong> {r.lemma}</p>
-              <p><strong>الجذر:</strong> {r.root}</p>
-              <p><strong>الموقع:</strong> سورة {r.sura}، آية {r.verse}</p>
-            </>
-          )}
-
-          {r.source === 'dataset' && <>/* …dataset UI… */</>}
-          {r.source === 'masaq'   && <>/* …masaq UI…   */</>}
-          {r.source === 'fallback' && (
-            <p className="text-blue-600">
-              ⚠️ تطابق احتياطي عبر جذر Nemlar: {r.root}
-            </p>
-          )}
+          <p><strong>الكلمة:</strong> {r.word}</p>
+          <p><strong>POS:</strong> {r.pos}</p>
+          <p><strong>Lemma:</strong> {r.lemma}</p>
+          <p><strong>الجذر:</strong> {r.root}</p>
+          <p>
+            <strong>الموقع:</strong> سورة {r.sura}، آية {r.verse}
+          </p>
         </div>
       ))}
     </div>
