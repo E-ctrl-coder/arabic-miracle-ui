@@ -14,6 +14,7 @@ export default function App() {
   const [results, setResults]                 = useState([]);
   const [error, setError]                     = useState('');
   const [rootMap, setRootMap]                 = useState(null);
+  const [corpusJSON, setCorpusJSON]           = useState(null);
   const [corpusIndex, setCorpusIndex]         = useState(new Map());
   const [corpusLoadError, setCorpusLoadError] = useState('');
 
@@ -43,39 +44,28 @@ export default function App() {
         if (!Array.isArray(json) || json.length === 0) {
           throw new Error('Empty or invalid quran-qac.json');
         }
-
         console.log('✅ Loaded corpus JSON, total entries:', json.length);
+        setCorpusJSON(json);
 
+        // build a Map: normalizedSurface → [entries]
         const idx = new Map();
-
-        json.forEach((entry, ix) => {
-          // 2a) stitch segments => raw surface
+        json.forEach(entry => {
+          // stitch segments → raw surface
           const raw = Array.isArray(entry.segments)
-            ? entry.segments
-                .map(s => 
-                  s.text
-                    .replace(/\u200C/g, '')  // remove zero-width
-                    .replace(/\u0640/g, '')  // remove tatweel
-                )
-                .join('')
+            ? entry.segments.map(s => s.text).join('')
             : '';
-
-          // 2b) normalize
           const key = normalizeArabic(raw);
           if (!key) return;
-
-          // 2c) push into map
           const bucket = idx.get(key) || [];
           bucket.push({ ...entry, _surface: raw });
           idx.set(key, bucket);
         });
 
-        // DEBUG: inspect a few keys
-        console.log('🔑 Sample normalized keys:', Array.from(idx.keys()).slice(0, 10));
-        // DEBUG: confirm بسم is in the index
-        console.log('🔍 "بسم" in index?', idx.has(normalizeArabic('بسم')));
+        // debug
+        console.log('🔑 Sample keys:', Array.from(idx.keys()).slice(0,10));
+        console.log('🔍 "بسم" in surface index?', idx.has(normalizeArabic('بسم')));
         if (idx.has(normalizeArabic('بسم'))) {
-          console.log('🔢 Hits for بسم:', idx.get(normalizeArabic('بسم')).length);
+          console.log('🔢 surface-hits for بسم:', idx.get(normalizeArabic('بسم')).length);
         }
 
         setCorpusIndex(idx);
@@ -98,16 +88,19 @@ export default function App() {
       setError('Please enter an Arabic word');
       return;
     }
+    if (!corpusJSON) {
+      setError('تعذر تحليل QAC لأن ملف quran-qac.json لم يُحمّل.');
+      return;
+    }
 
     const target = normalizeArabic(w);
-
-    // 3a) local index lookup
-    const localBucket = corpusIndex.get(target) || [];
     let merged = [];
 
-    if (localBucket.length) {
-      console.log(`🏷 Found ${localBucket.length} local hits for "${w}"`);
-      merged = localBucket.map(entry => ({
+    // 3a) surface-form lookup
+    const surfaceHits = corpusIndex.get(target) || [];
+    if (surfaceHits.length) {
+      console.log(`🏷 surface-hits for "${w}":`, surfaceHits.length);
+      merged = surfaceHits.map(entry => ({
         source: 'qac',
         word:   entry._surface,
         pos:    entry.pos     || '—',
@@ -116,39 +109,72 @@ export default function App() {
         sura:   entry.sura,
         verse:  entry.aya
       }));
-    } else {
-      console.warn(`⚠️ No local hits for "${w}", falling back to API...`);
+    }
+
+    // 3b) lemma fallback
+    if (!merged.length) {
+      const lemmaHits = corpusJSON.filter(e =>
+        normalizeArabic(e.features?.LEM || '') === target
+      );
+      if (lemmaHits.length) {
+        console.log(`🏷 lemma-hits for "${w}":`, lemmaHits.length);
+        merged = lemmaHits.map(entry => ({
+          source: 'qac-lemma',
+          word:   entry.segments.map(s => s.text).join(''),
+          pos:    entry.pos     || '—',
+          lemma:  entry.features?.LEM  || '—',
+          root:   entry.features?.ROOT || '—',
+          sura:   entry.sura,
+          verse:  entry.aya
+        }));
+      }
+    }
+
+    // 3c) root fallback
+    if (!merged.length) {
+      const rootHits = corpusJSON.filter(e =>
+        normalizeArabic(e.features?.ROOT || '') === target
+      );
+      if (rootHits.length) {
+        console.log(`🏷 root-hits for "${w}":`, rootHits.length);
+        merged = rootHits.map(entry => ({
+          source: 'qac-root',
+          word:   entry.segments.map(s => s.text).join(''),
+          pos:    entry.pos     || '—',
+          lemma:  entry.features?.LEM  || '—',
+          root:   entry.features?.ROOT || '—',
+          sura:   entry.sura,
+          verse:  entry.aya
+        }));
+      }
+    }
+
+    // 3d) final API fallback if still empty
+    if (!merged.length) {
+      console.warn(`⚠️ No local QAC hits for "${w}", querying API…`);
       try {
         const res = await fetch(`${API_URL}/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ word: w })
         });
-
         if (!res.ok) {
           const errJson = await res.json().catch(() => ({}));
           setError(errJson.error || `Server error ${res.status}`);
           return;
         }
-
         const data = await res.json();
-        // merge dataset + server QAC
+        // merge Nemlar + server QAC
         if (data.dataset !== undefined && data.qac !== undefined) {
-          const ds = data.dataset;
-          const qac = data.qac;
-          let localRm = rootMap;
-          if (!localRm) {
-            localRm = buildRootMap(ds);
-            setRootMap(localRm);
+          const ds = data.dataset, qc = data.qac;
+          let rm = rootMap;
+          if (!rm) {
+            rm = buildRootMap(ds);
+            setRootMap(rm);
           }
-          merged = [...ds, ...qac];
-          if (
-            Array.isArray(qac) && qac.length === 0 &&
-            window.ENABLE_FALLBACK_MATCHER === 'true' &&
-            localRm
-          ) {
-            const fb = fallbackByRoot(w, localRm)
-              .map(e => ({ ...e, source: 'fallback' }));
+          merged = [...ds, ...qc];
+          if (!qc.length && window.ENABLE_FALLBACK_MATCHER === 'true') {
+            const fb = fallbackByRoot(w, rm).map(e => ({ ...e, source: 'fallback' }));
             merged = [...ds, ...fb];
           }
           if (data.suggestion) setError(data.suggestion);
@@ -168,7 +194,7 @@ export default function App() {
     <div className="App p-8 bg-gray-50" dir="rtl">
       <JsonCheck />
 
-      <h1 className="text-2xl mb-4">محل الصرف العربي</h1>
+      <h1 className="text-2xl mb-4">محلل الصرف العربي</h1>
 
       {corpusLoadError && (
         <div className="mb-4 p-4 bg-red-200 text-red-800 rounded">
@@ -194,13 +220,13 @@ export default function App() {
 
       {error && <p className="text-red-600 mb-4">{error}</p>}
 
-      {results.map((r, idx) => (
-        <div key={idx} className="mb-6 border p-4 rounded bg-white">
+      {results.map((r, i) => (
+        <div key={i} className="mb-6 border p-4 rounded bg-white">
           <p className="text-sm text-gray-600 mb-2">
             <strong>المصدر:</strong> {r.source}
           </p>
 
-          {r.source === 'qac' && (
+          {r.source.startsWith('qac') && (
             <>
               <p><strong>الكلمة الأصلية:</strong> {r.word}</p>
               <p><strong>POS:</strong> {r.pos}</p>
@@ -211,7 +237,7 @@ export default function App() {
           )}
 
           {r.source === 'dataset' && <>/* …dataset UI… */</>}
-          {r.source === 'masaq'   && <>/* …masaq UI… */</>}
+          {r.source === 'masaq'   && <>/* …masaq UI…   */</>}
           {r.source === 'fallback' && (
             <p className="text-blue-600">
               ⚠️ تطابق احتياطي عبر جذر Nemlar: {r.root}
