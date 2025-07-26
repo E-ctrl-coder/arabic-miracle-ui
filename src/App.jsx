@@ -19,7 +19,7 @@ export default function App() {
 
   const API_URL = 'https://arabic-miracle-api.onrender.com';
 
-  // 1) load the merged QAC JSON once
+  // 1) load the merged QAC JSON once and run an audit
   useEffect(() => {
     fetch('/quran-qac.json')
       .then(res => {
@@ -30,13 +30,43 @@ export default function App() {
         if (!Array.isArray(json) || json.length === 0) {
           throw new Error('Empty or invalid quran-qac.json');
         }
+
         console.log('✅ Loaded corpus JSON, total tokens:', json.length);
+        setCorpusJSON(json);
 
         // —— DEBUG: inspect one entry’s shape —— 
         console.log('Corpus sample entry:', json[0]);
         console.log('Corpus entry keys:', Object.keys(json[0]));
 
-        setCorpusJSON(json);
+        // —— DEBUG: reconstruct & log first 10 tokens —— 
+        json.slice(0, 10).forEach((entry, i) => {
+          const reconstructed = Array.isArray(entry.segments)
+            ? entry.segments.map(s => s.text).join('')
+            : '';
+          console.log(`🔍 [${i}] reconstructed token:`, reconstructed);
+        });
+
+        // —— AUDIT: check presence of "بسم" —— 
+        const normalizeArabic = str =>
+          str
+            .normalize('NFC')
+            .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+            .replace(/ٱ|أ|إ|آ/g, 'ا')
+            .replace(/ﻻ/g, 'لا')
+            .replace(/\u200C/g, '')
+            .replace(/\s+/g, '')
+            .replace(/[^\u0621-\u064A]/g, '')
+            .trim();
+
+        const targetNorm = normalizeArabic('بسم');
+        const matchCount = json.filter(entry => {
+          const surfaceText = Array.isArray(entry.segments)
+            ? entry.segments.map(s => s.text).join('')
+            : '';
+          return normalizeArabic(surfaceText) === targetNorm;
+        }).length;
+
+        console.log('🔢 Matches for "بسم":', matchCount);
       })
       .catch(err => {
         console.error('❌ Failed to load quran-qac.json:', err);
@@ -50,12 +80,12 @@ export default function App() {
   function normalizeArabic(str) {
     return str
       .normalize('NFC')
-      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')  // strip harakat, dagger alif, tatwil
-      .replace(/ٱ|أ|إ|آ/g, 'ا')                    // unify alif forms
-      .replace(/ﻻ/g, 'لا')                          // ligature
-      .replace(/\u200C/g, '')                       // zero-width non-joiner
-      .replace(/\s+/g, '')                          // whitespace
-      .replace(/[^\u0621-\u064A]/g, '')             // non-Arabic
+      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+      .replace(/ٱ|أ|إ|آ/g, 'ا')
+      .replace(/ﻻ/g, 'لا')
+      .replace(/\u200C/g, '')
+      .replace(/\s+/g, '')
+      .replace(/[^\u0621-\u064A]/g, '')
       .trim();
   }
 
@@ -128,20 +158,14 @@ export default function App() {
       console.log('📊 Corpus size:', corpusJSON.length);
       console.log('🔍 Looking for normalized token:', targetNorm);
 
-      // — CHANGED BLOCK START —
       const localHits = corpusJSON
         .map(entry => {
-          // If there's no `surface`, stitch together any `segments` you do have
-          const surfaceText = entry.surface
-            || (Array.isArray(entry.segments)
-                ? entry.segments.map(seg => seg.text).join('')
-                : '');
+          const surfaceText = Array.isArray(entry.segments)
+            ? entry.segments.map(s => s.text).join('')
+            : '';
           return { ...entry, surfaceText };
         })
-        .filter(entry => {
-          const tokNorm = normalizeArabic(entry.surfaceText);
-          return tokNorm === targetNorm;
-        })
+        .filter(entry => normalizeArabic(entry.surfaceText) === targetNorm)
         .map(entry => ({
           source: 'qac',
           word:   entry.surfaceText,
@@ -151,7 +175,6 @@ export default function App() {
           sura:   entry.sura,
           verse:  entry.aya
         }));
-      // — CHANGED BLOCK END —
 
       console.log('🔢 localHits count:', localHits.length);
       merged = [...merged, ...localHits];
