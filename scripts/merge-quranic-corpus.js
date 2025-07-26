@@ -4,6 +4,23 @@ import fs from 'fs'
 import path from 'path'
 
 /**
+ * Read a text file and auto-decode BOM’d UTF-16LE or UTF-8 (or plain UTF-8)
+ */
+function readTextFile(fp) {
+  const buf = fs.readFileSync(fp)
+  // UTF‐16LE BOM: 0xFF 0xFE
+  if (buf[0] === 0xFF && buf[1] === 0xFE) {
+    return buf.toString('utf16le')
+  }
+  // UTF‐8 BOM: 0xEF 0xBB 0xBF
+  if (buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) {
+    return buf.toString('utf8').slice(1)
+  }
+  // default to UTF-8
+  return buf.toString('utf8')
+}
+
+/**
  * 0) Arabic → Buckwalter converter (inline)
  */
 const bwMap = {
@@ -47,37 +64,27 @@ async function main() {
     process.exit(1)
   }
 
-  // 2) Read & split lines
-  const quranLines = fs.readFileSync(quranPath, 'utf8')
-    .trim().split(/\r?\n/).filter(l => l)
+  // 2) Read & split lines (auto-decode BOM/encoding)
+  const quranText  = readTextFile(quranPath)
+  const quranLines = quranText.trim().split(/\r?\n/).filter(l => l)
+  console.log('❓ verses read from quran.txt:', quranLines.length)
 
-  const qacLinesRaw = fs.readFileSync(qacPath, 'utf8')
-    .trim().split(/\r?\n/).filter(l => l)
-
-  // skip header if present
+  const qacText     = readTextFile(qacPath)
+  const qacLinesRaw = qacText.trim().split(/\r?\n/).filter(l => l)
   const startIdx    = qacLinesRaw[0].startsWith('sura') ? 1 : 0
   const corpusLines = qacLinesRaw.slice(startIdx)
+  console.log('❓ morphology lines (minus header):', corpusLines.length)
 
   // 3) Build QAC index
-  //    KEY = sura|verse|wordIndex|buckwalterForm
   const corpusIndex = new Map()
-
   for (const line of corpusLines) {
-    const parts = line.split('\t')
-    if (parts.length < 4) continue
+    const [locRaw, bwForm, posTag, featsRaw] = line.split('\t')
+    if (!locRaw || !bwForm || !posTag) continue
 
-    // e.g. "(1:1:1:2)"
-    const loc      = parts[0].replace(/[()]/g, '')
-    const bwForm   = parts[1]
-    const posTag   = parts[2]
-    const featsRaw = parts[3]
+    const loc = locRaw.replace(/[()]/g, '')      // "1:1:2:1"
+    const [sura, verse, wordIdx] = loc.split(':')
+    if (!sura || !verse || !wordIdx) continue
 
-    // locParts = [sura, verse, wordIdx, segmentIdx]
-    const locParts = loc.split(':')
-    if (locParts.length < 3) continue
-    const [sura, verse, wordIdx] = locParts
-
-    // parse feature list
     const features = {}
     featsRaw.split('|').forEach(chunk => {
       if (!chunk) return
@@ -90,22 +97,18 @@ async function main() {
     corpusIndex.get(key).push({ pos: posTag, features })
   }
 
-  // 4) Walk each verse → split into tokens → lookup
+  // 4) Merge each verse → tokens → lookup
   const merged = []
-
   for (const line of quranLines) {
-    // Format: "sura|verse|full text of verse"
     const [sura, verse, text] = line.split('|')
     if (!sura || !verse || !text) continue
 
     const tokens = text.trim().split(/\s+/)
     tokens.forEach((token, idx) => {
       const bwKey = arabicToBuckwalter(token)
-      // Here’s the tweak: include (idx+1) to match wordIdx in QAC file
       const key   = `${sura}|${verse}|${idx + 1}|${bwKey}`
-
-      const hits = corpusIndex.get(key) || []
-      const norm = normalizeArabic(token)
+      const hits  = corpusIndex.get(key) || []
+      const norm  = normalizeArabic(token)
 
       if (hits.length) {
         hits.forEach(hit => {
