@@ -9,7 +9,7 @@
   "scripts": {
     "merge:qac":       "node scripts/merge-quranic-corpus.js",
     "verify:qac":      "node scripts/verify-qac.js",
-    "verify:alignment":"node scripts/verify-alignment.js",
+    "verify:alignment":"node scripts/verify-alignment.cjs",
     "build":           "npm run merge:qac && npm run verify:qac && vite build",
     "dev":             "vite",
     "preview":         "vite preview",
