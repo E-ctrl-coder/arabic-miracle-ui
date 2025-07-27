@@ -158,4 +158,22 @@ async function main() {
   });
 
   // 5) Wrap with metadata and write
-  const output =
+  const output = {
+    metadata: {
+      sourceQuran: path.basename(quranPath),
+      sourceQAC:   path.basename(qacPath),
+      generatedAt: new Date().toISOString(),
+      totalSegments: merged.length
+    },
+    segments: merged
+  };
+
+  fs.writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf8');
+  console.log(`✅ Wrote ${merged.length} segments to ${path.relative(process.cwd(), outPath)}`);
+}
+
+// invoke
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
