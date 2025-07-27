@@ -1,7 +1,7 @@
-// scripts/verify-alignment.js
+// scripts/verify-alignment.js (ESM)
+import fs from 'fs';
+import path from 'path';
 
-const fs = require('fs')
-const path = require('path')
 
 // Utility to normalize Arabic strings (NFC)
 function normalize(str) {
