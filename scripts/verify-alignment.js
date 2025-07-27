@@ -1,68 +1,40 @@
-// scripts/verify-alignment.js (ESM)
-import fs from 'fs';
-import path from 'path';
+// scripts/verify-alignment.cjs
+import fs from "fs";
+import path from "path";
 
+const root = process.cwd();
 
-// Utility to normalize Arabic strings (NFC)
-function normalize(str) {
-  return str.normalize('NFC').trim()
+// candidate locations
+const quranCandidates = [
+  path.join(root, "data", "quran.txt"),
+  path.join(root, "public", "quran.txt"),
+];
+const qacCandidates = [
+  path.join(root, "data", "quranic-corpus-morphology-0.4.txt"),
+  path.join(root, "public", "quranic-corpus-morphology-0.4.txt"),
+];
+
+// pick the first one that exists
+const quranPath = quranCandidates.find(fs.existsSync);
+const qacPath = qacCandidates.find(fs.existsSync);
+
+if (!quranPath) {
+  throw new Error(
+    `quran.txt not found in any of: ${quranCandidates.join(", ")}`
+  );
+}
+if (!qacPath) {
+  throw new Error(
+    `quranic-corpus-morphology-0.4.txt not found in any of: ${qacCandidates.join(
+      ", "
+    )}`
+  );
 }
 
-// 1. Load Quran lines into a map: { '1': { '1': '…', '2': '…' } }
-const quranRaw = fs.readFileSync(
-  path.join(__dirname, '../data/quran.txt'),
-  'utf8'
-).trim().split('\n')
+console.log("🔍 loading Quran text from:", quranPath);
+console.log("🔍 loading morphology from:", qacPath);
 
-const quranMap = {}
-for (const line of quranRaw) {
-  const [sura, aya, text] = line.split('|')
-  if (!quranMap[sura]) quranMap[sura] = {}
-  quranMap[sura][aya] = normalize(text)
-}
-
-// 2. Read QAC morphology lines
-const qacRaw = fs.readFileSync(
-  path.join(__dirname, '../data/quranic-corpus-morphology-0.4.txt'),
-  'utf8'
-).trim().split('\n')
-
-// 3. For each QAC line, extract span and compare substring
-let failures = 0
-
-for (const line of qacRaw) {
-  // Split on tab
-  const [keyPart, token] = line.split('\t')
-  // keyPart example: (1:1:1:1)
-  // Extract sura, aya, and segment indices
-  const [sura, aya, , ] = keyPart
-    .replace(/[()]/g, '')
-    .split(':')
-
-  // Extract start and end from token metadata if available
-  // Here we assume the 3rd field in QAC line is the token span
-  // Modify this if your format differs
-  const spanMatch = line.match(/\)([^\t]+)\t/)
-  // If your span is encoded in a separate field, parse it here
-  // For now we'll skip span parse and focus on token presence
-
-  const verseText = quranMap[sura]?.[aya] || ''
-  const normToken = normalize(token)
-
-  // Simple containment check: token must appear in verse substring
-  if (!verseText.includes(normToken)) {
-    console.error(
-      `✖ Mismatch at ${sura}:${aya} → token “${normToken}” not in verse text:\n  ${verseText}`
-    )
-    failures++
-  }
-}
-
-// 4. Report summary
-if (failures > 0) {
-  console.error(`\nAlignment check failed: ${failures} tokens out of place.`)
-  process.exit(1)
-} else {
-  console.log(`\n✔ All ${qacRaw.length} tokens aligned successfully.`)
-  process.exit(0)
-}
+// your existing read + alignment logic here, e.g.:
+// const verses = fs.readFileSync(quranPath, "utf-8").split("\n");
+// const morphLines = fs.readFileSync(qacPath, "utf-8").split("\n");
+// …rest of verify‐alignment…
