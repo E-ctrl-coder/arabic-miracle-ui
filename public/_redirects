@@ -1,4 +1,0 @@
-/quran-qac.json   /quran-qac.json                                  200
-/analyze          https://arabic-miracle-api.onrender.com/analyze   200
-/debug/*          https://arabic-miracle-api.onrender.com/debug/:splat   200
-/*                /index.html                                      200
