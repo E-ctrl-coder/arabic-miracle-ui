@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import { XMLParser } from 'fast-xml-parser';
 
-// 1. Load QAC tokens from the text dump
+// Load QAC tokens from qac.txt
 export async function loadQAC() {
   const res = await fetch('/qac.txt');
   if (!res.ok) throw new Error('Failed to fetch qac.txt');
@@ -18,7 +18,7 @@ export async function loadQAC() {
   });
 }
 
-// 2. Load & parse Nemlar XML files from the ZIP
+// Load & parse Nemlar XML files from nemlar.zip
 export async function loadNemlar() {
   const res = await fetch('/nemlar.zip');
   if (!res.ok) throw new Error('Failed to fetch nemlar.zip');
