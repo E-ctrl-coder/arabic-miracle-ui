@@ -1,49 +1,62 @@
+// src/dataLoader.js
 import JSZip from 'jszip';
-import { XMLParser } from 'fast-xml-parser';
 
-// Load QAC tokens from qac.txt
-export async function loadQAC() {
-  const res = await fetch('/qac.txt');
-  if (!res.ok) throw new Error('Failed to fetch qac.txt');
-  const text = await res.text();
-  const lines = text.trim().split('\n');
-  console.log('QAC lines fetched:', lines.length);
-
-  return lines.map(line => {
-    const [word, analyses] = line.split('\t');
-    return {
-      word,
-      analyses: analyses ? analyses.split('|') : []
-    };
-  });
+// Parse a single QAC line into { surface, tags }
+function parseLine(line) {
+  // Split on tab: first element is the word, the rest are morphological tags
+  const parts = line.split('\t');
+  return {
+    surface: parts[0],
+    tags: parts.slice(1),
+  };
 }
 
-// Load & parse Nemlar XML files from nemlar.zip
+export async function loadQAC() {
+  console.log('[loadQAC] → fetching /qac.txt');
+  const res = await fetch('/qac.txt');
+  if (!res.ok) {
+    console.error('[loadQAC] fetch failed:', res.status);
+    return [];
+  }
+
+  const raw = await res.text();
+  console.log('[loadQAC] raw length:', raw.length);
+
+  // Split into lines, trim whitespace, remove blanks and comment lines
+  const lines = raw
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l !== '' && !l.startsWith('#'));
+
+  console.log('[loadQAC] lines after filter:', lines.length);
+
+  // Map to token objects
+  const tokens = lines.map(parseLine);
+  console.log('[loadQAC] parsed tokens count:', tokens.length);
+
+  return tokens;
+}
+
 export async function loadNemlar() {
+  console.log('[loadNemlar] → fetching /nemlar.zip');
   const res = await fetch('/nemlar.zip');
-  if (!res.ok) throw new Error('Failed to fetch nemlar.zip');
-  const buffer = await res.arrayBuffer();
-  console.log('Nemlar ZIP size:', buffer.byteLength);
-
-  const zip = await JSZip.loadAsync(buffer);
-  const xmlFiles = Object.values(zip.files)
-    .filter(f => f.name.toLowerCase().endsWith('.xml'));
-
-  if (!xmlFiles.length) {
-    throw new Error('No XML files found in nemlar.zip');
-  }
-  console.log('XML files found:', xmlFiles.map(f => f.name));
-
-  const parser = new XMLParser({ ignoreAttributes: false });
-  const docs = [];
-  for (const file of xmlFiles) {
-    const xmlText = await file.async('text');
-    docs.push({
-      name: file.name,
-      content: parser.parse(xmlText)
-    });
+  if (!res.ok) {
+    console.error('[loadNemlar] fetch failed:', res.status);
+    return [];
   }
 
-  console.log(`Parsed ${docs.length} Nemlar documents`);
+  const blob = await res.blob();
+  const zip = await JSZip.loadAsync(blob);
+  const entries = Object.entries(zip.files);
+  console.log('[loadNemlar] zip entries:', entries.map(([name]) => name));
+
+  const docs = await Promise.all(
+    entries.map(async ([name, file]) => ({
+      name,
+      text: await file.async('text'),
+    }))
+  );
+  console.log('[loadNemlar] documents count:', docs.length);
+
   return docs;
 }
