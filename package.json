@@ -2,31 +2,22 @@
   "name": "arabic-miracle-ui",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=22.16.0 <23"
-  },
   "scripts": {
-    "merge:qac": "node scripts/merge-quranic-corpus.js",
-    "verify:qac": "node scripts/verify-qac.js",
-    "verify:alignment": "node scripts/verify-alignment.cjs",
-    "build": "npm run merge:qac && npm run verify:qac && vite build",
     "dev": "vite",
-    "preview": "vite preview",
-    "start": "vite preview --port $PORT"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "axios": "^1.6.8",
-    "fast-xml-parser": "^5.2.5",
     "jszip": "^3.10.1",
+    "fast-xml-parser": "^4.0.10",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.0",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.3",
-    "vite": "^5.0.0"
+    "vite": "^4.3.9"
+  },
+  "engines": {
+    "node": ">=16"
   }
 }

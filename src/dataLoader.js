@@ -1,4 +1,3 @@
-// src/dataLoader.js
 import JSZip from 'jszip';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -7,21 +6,16 @@ export async function loadQAC() {
   const res = await fetch('/qac.txt');
   if (!res.ok) throw new Error('Failed to fetch qac.txt');
   const text = await res.text();
-  
-  // Each line is: word[TAB]analysis1|analysis2|…
   const lines = text.trim().split('\n');
   console.log('QAC lines fetched:', lines.length);
 
-  const tokens = lines.map(line => {
+  return lines.map(line => {
     const [word, analyses] = line.split('\t');
     return {
       word,
       analyses: analyses ? analyses.split('|') : []
     };
   });
-
-  console.log('Parsed QAC tokens:', tokens.length);
-  return tokens;
 }
 
 // 2. Load & parse Nemlar XML files from the ZIP
@@ -36,7 +30,7 @@ export async function loadNemlar() {
     .filter(f => f.name.toLowerCase().endsWith('.xml'));
 
   if (!xmlFiles.length) {
-    throw new Error('No XML files found in Nemlar ZIP');
+    throw new Error('No XML files found in nemlar.zip');
   }
   console.log('XML files found:', xmlFiles.map(f => f.name));
 
@@ -44,8 +38,10 @@ export async function loadNemlar() {
   const docs = [];
   for (const file of xmlFiles) {
     const xmlText = await file.async('text');
-    const jsonObj = parser.parse(xmlText);
-    docs.push({ name: file.name, content: jsonObj });
+    docs.push({
+      name: file.name,
+      content: parser.parse(xmlText)
+    });
   }
 
   console.log(`Parsed ${docs.length} Nemlar documents`);
