@@ -1,13 +1,24 @@
 /* src/index.css */
 
-/* Arabic font + RTL */
+/* —————————————————————————————————————
+   Tailwind Directives (must be first)
+   ————————————————————————————————————— */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* —————————————————————————————————————
+   Arabic font + RTL
+   ————————————————————————————————————— */
 body {
   font-family: 'Noto Naskh Arabic', serif;
   direction: rtl;
   background-color: #f9fafb;
 }
 
-/* Match the classNames your JSX emits */
+/* —————————————————————————————————————
+   Custom Classes for Segments & Patterns
+   ————————————————————————————————————— */
 .segment-prefix {
   color: blue;
   font-weight: bold;
@@ -23,7 +34,6 @@ body {
   font-weight: bold;
 }
 
-/* For the full pattern + affixes rendering */
 .pattern-affix {
   color: blue;
 }
