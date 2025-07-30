@@ -16,13 +16,30 @@ async function fetchNemlarZip() {
   return res.blob();
 }
 
+/** Parse QAC text → { entries, rootIndex } */
+function parseQAC(text) {
+  const lines = text.split("\n").filter((l) => l.trim() !== "");
+  const entries = lines.map((ln) => {
+    const [verseKey, token, seg, root, pattern, lemma, pos] = ln.split("\t");
+    const [prefix, stem, suffix] = seg.split("|");
+    return { verseKey, token, prefix, stem, suffix, root, pattern, lemma, pos };
+  });
+
+  const rootIndex = entries.reduce((idx, e) => {
+    if (!idx[e.root]) idx[e.root] = new Set();
+    idx[e.root].add(e.verseKey);
+    return idx;
+  }, {});
+
+  return { entries, rootIndex };
+}
+
 /** Parse Nemlar ZIP → array of annotation entries */
 async function parseNemlar(blob) {
   const zip = await JSZip.loadAsync(blob);
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "$" });
   const entries = [];
 
-  // iterate every file inside the ZIP
   await Promise.all(
     Object.entries(zip.files).map(async ([filename, file]) => {
       const xmlText = await file.async("text");
@@ -31,7 +48,6 @@ async function parseNemlar(blob) {
       const list = Array.isArray(sentences) ? sentences : [sentences];
 
       list.forEach((sent) => {
-        // each <sentence> has one or more <annotation> children
         const annots = Array.isArray(sent.annotation)
           ? sent.annotation
           : [sent.annotation];
@@ -57,27 +73,19 @@ async function parseNemlar(blob) {
   return entries;
 }
 
-/** Parse QAC text → entries + build root→verses index */
-function parseQAC(text) {
-  const lines = text.split("\n").filter((l) => l.trim() !== "");
-  const entries = lines.map((ln) => {
-    // tab-delimited: verseKey, token, seg, root, pattern, lemma, pos
-    const [verseKey, token, seg, root, pattern, lemma, pos] = ln.split("\t");
-    const [prefix, stem, suffix] = seg.split("|");
-    return { verseKey, token, prefix, stem, suffix, root, pattern, lemma, pos };
-  });
-
-  // build an index: root → Set of verseKeys
-  const rootIndex = entries.reduce((idx, e) => {
-    if (!idx[e.root]) idx[e.root] = new Set();
-    idx[e.root].add(e.verseKey);
-    return idx;
-  }, {});
-
-  return { entries, rootIndex };
+/** Load & parse only QAC */
+export async function loadQAC() {
+  const text = await fetchQACText();
+  return parseQAC(text);
 }
 
-/** Public: load and parse both corpora */
+/** Load & parse only Nemlar */
+export async function loadNemlar() {
+  const blob = await fetchNemlarZip();
+  return parseNemlar(blob);
+}
+
+/** Load both corpora: QAC entries + rootIndex, Nemlar entries */
 export async function loadCorpora() {
   const [qacText, nemlarBlob] = await Promise.all([
     fetchQACText(),
