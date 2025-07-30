@@ -1,15 +1,14 @@
-// src/dataLoader.js
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 
 /**
- * Buckwalter → Arabic mapping
- * Source: https://corpus.quran.com/buckwalter.html
- */
+ - Buckwalter → Arabic mapping
+ - Source: https://corpus.quran.com/buckwalter.html
+*/
 const BW2AR = {
   "'": "ء", "|": "آ", ">": "أ", "&": "ؤ", "<": "إ", "}": "ئ",
   "A": "ا", "b": "ب", "p": "ة", "t": "ت", "v": "ث", "j": "ج",
-  "H": "ح", "x": "خ", "d": "د", "*": "ذ", "r": "ر", "z": "ز",
+  "H": "ح", "x": "خ", "d": "د",  "": "ذ", "r": "ر", "z": "ز",
   "s": "س", "$": "ش", "S": "ص", "D": "ض", "T": "ط", "Z": "ظ",
   "E": "ع", "g": "غ", "f": "ف", "q": "ق", "k": "ك", "l": "ل",
   "m": "م", "n": "ن", "h": "ه", "w": "و", "Y": "ى", "y": "ي",
@@ -52,20 +51,19 @@ async function fetchNemlarZip() {
 }
 
 /**
- * Parse QAC v0.4 (4-column Buckwalter file)
- * Skips header lines starting with '#'. Builds:
- *  - entries: array of { location, token, prefix, stem, suffix, root, pattern, lemma, pos }
- *  - rootIndex: { [root]: [location, …] }
- */
+ - Parse QAC v0.4 (4-column Buckwalter file)
+ - Skips header lines starting with '#'. Builds:
+   - entries: array of { location, token, prefix, stem, suffix, root, pattern, lemma, pos }
+   - rootIndex: { [root]: [location, …] }
+*/
 function parseQAC(text) {
   const lines = text.split("\n");
   const entries = [];
   const rootIndex = {};
 
   lines.forEach((ln, idx) => {
-    if (!ln || ln.startsWith("#")) {
-      return;
-    }
+    if (!ln || ln.startsWith("#")) return;
+
     const parts = ln.split("\t");
     if (parts.length !== 4) {
       console.log(`parseQAC: skipping line ${idx + 1} (${parts.length} fields)`);
@@ -109,7 +107,7 @@ function parseQAC(text) {
       }
     });
 
-    // Derive stem by stripping prefix & suffix from token
+    // Derive stem by stripping prefix & suffix
     stem = token;
     if (prefix && stem.startsWith(prefix)) {
       stem = stem.slice(prefix.length);
@@ -121,12 +119,12 @@ function parseQAC(text) {
     entries.push({ location, token, prefix, stem, suffix, root, pattern, lemma, pos });
 
     if (root) {
-      if (!rootIndex[root]) rootIndex[root] = new Set();
+      rootIndex[root] = rootIndex[root] || new Set();
       rootIndex[root].add(location);
     }
   });
 
-  // Convert rootIndex sets → arrays for JSON-friendliness
+  // Convert rootIndex sets → arrays
   Object.keys(rootIndex).forEach((r) => {
     rootIndex[r] = Array.from(rootIndex[r]).sort();
   });
@@ -140,7 +138,10 @@ function parseQAC(text) {
 /** Parse Nemlar ZIP → flat array of annotation objects */
 async function parseNemlar(blob) {
   const zip = await JSZip.loadAsync(blob);
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "$" });
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "$"
+  });
   const entries = [];
 
   await Promise.all(
@@ -151,7 +152,9 @@ async function parseNemlar(blob) {
       const list = Array.isArray(sentences) ? sentences : [sentences];
 
       list.forEach((sent) => {
-        const anns = Array.isArray(sent.annotation) ? sent.annotation : [sent.annotation];
+        const anns = Array.isArray(sent.annotation)
+          ? sent.annotation
+          : [sent.annotation];
         anns.forEach((a) => {
           entries.push({
             filename,
@@ -163,7 +166,7 @@ async function parseNemlar(blob) {
             root: a.$.root,
             pattern: a.$.pattern,
             lemma: a.$.lemma,
-            pos: a.$.pos,
+            pos: a.$.pos
           });
         });
       });
