@@ -1,114 +1,156 @@
 // src/App.jsx
-import React, { useEffect, useState } from "react";
-import { loadCorpora } from "./dataLoader";
+import React, { useState } from "react";
+import { loadQAC, loadNemlar } from "./dataLoader";
 
 export default function App() {
-  const [data, setData] = useState(null);
-  const [word, setWord] = useState("");
-  const [result, setResult] = useState({ qac: null, nemlar: [] });
+  const [query, setQuery] = useState("");
+  const [qacMatches, setQacMatches] = useState([]);
+  const [qacVerses, setQacVerses] = useState([]);
+  const [nemlarMatches, setNemlarMatches] = useState([]);
   const [error, setError] = useState("");
 
-  // Load corpora on mount
-  useEffect(() => {
-    loadCorpora()
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, []);
+  async function handleSearch(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      // Load both corpora in parallel
+      const [{ entries, rootIndex }, nemEntries] = await Promise.all([
+        loadQAC(),
+        loadNemlar(),
+      ]);
 
-  // Trigger analysis when user clicks
-  function analyze() {
-    if (!data || !word.trim()) return;
+      // Filter QAC by token and collect verses for the root
+      const filteredQAC = entries.filter((e) => e.token === query);
+      const root = filteredQAC[0]?.root;
+      const verses = root
+        ? Array.from(rootIndex[root]).sort()
+        : [];
 
-    // QAC: first match on token
-    const qacMatch = data.qacEntries.find((e) => e.token === word);
-    const verses = qacMatch
-      ? Array.from(data.rootIndex[qacMatch.root])
-      : [];
+      // Filter Nemlar by token
+      const filteredNem = nemEntries.filter((e) => e.token === query);
 
-    // Nemlar: all matches on token
-    const nemlarMatches = data.nemlarEntries.filter((e) => e.token === word);
-
-    setResult({ qac: qacMatch ? { ...qacMatch, verses } : null, nemlar: nemlarMatches });
-  }
-
-  if (error) {
-    return <div style={{ color: "red" }}>Error: {error}</div>;
-  }
-  if (!data) {
-    return <div>Loading corpora…</div>;
+      setQacMatches(filteredQAC);
+      setQacVerses(verses);
+      setNemlarMatches(filteredNem);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    }
   }
 
   return (
-    <div style={{ padding: "1rem", fontFamily: "sans-serif" }}>
-      <h1>Arabic Morphological Analyzer</h1>
-
-      <div style={{ margin: "1rem 0" }}>
+    <div className="p-6 space-y-6">
+      <form onSubmit={handleSearch} className="flex space-x-2">
         <input
           type="text"
-          value={word}
-          onChange={(e) => setWord(e.target.value)}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Enter Arabic word"
-          style={{ fontSize: "1.1rem", padding: "0.5rem", width: "300px" }}
+          className="border px-2 py-1 flex-grow"
         />
         <button
-          onClick={analyze}
-          style={{ marginLeft: "0.5rem", padding: "0.5rem 1rem" }}
+          type="submit"
+          className="bg-blue-600 text-white px-4"
         >
           Analyze
         </button>
-      </div>
+      </form>
 
-      {/* QAC Result */}
-      {result.qac && (
-        <section style={{ marginBottom: "2rem" }}>
-          <h2>QAC Analysis</h2>
-          <table>
-            <tbody>
-              <tr><th>Prefix</th><td>{result.qac.prefix}</td></tr>
-              <tr><th>Stem</th><td>{result.qac.stem}</td></tr>
-              <tr><th>Suffix</th><td>{result.qac.suffix}</td></tr>
-              <tr><th>Root</th><td>{result.qac.root}</td></tr>
-              <tr><th>Pattern</th><td>{result.qac.pattern}</td></tr>
-              <tr><th>Lemma</th><td>{result.qac.lemma}</td></tr>
-              <tr><th>POS</th><td>{result.qac.pos}</td></tr>
-            </tbody>
-          </table>
-          <p>
-            Root appears in verses:{" "}
-            {result.qac.verses.length > 0
-              ? result.qac.verses.join(", ")
-              : "none found"}
-          </p>
-        </section>
-      )}
+      {error && <div className="text-red-600">{error}</div>}
 
-      {/* Nemlar Results */}
-      {result.nemlar.length > 0 && (
-        <section>
-          <h2>
-            Nemlar Analysis ({result.nemlar.length} match
-            {result.nemlar.length > 1 ? "es" : ""})
-          </h2>
-          {result.nemlar.map((e, i) => (
-            <div key={i} style={{ marginBottom: "1rem" }}>
-              <strong>
-                {e.filename} – sentence {e.sentenceId}
-              </strong>
-              <table>
+      <div className="grid grid-cols-2 gap-6">
+        {/* QAC Results */}
+        <div>
+          <h2 className="text-lg font-semibold mb-2">QAC Analysis</h2>
+          {qacMatches.length === 0
+            ? <p>No QAC matches</p>
+            : (
+              <table className="w-full text-sm border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-1">token</th>
+                    <th className="border px-1">prefix</th>
+                    <th className="border px-1">stem</th>
+                    <th className="border px-1">suffix</th>
+                    <th className="border px-1">root</th>
+                    <th className="border px-1">pattern</th>
+                    <th className="border px-1">lemma</th>
+                    <th className="border px-1">pos</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  <tr><th>Prefix</th><td>{e.prefix}</td></tr>
-                  <tr><th>Stem</th><td>{e.stem}</td></tr>
-                  <tr><th>Suffix</th><td>{e.suffix}</td></tr>
-                  <tr><th>Root</th><td>{e.root}</td></tr>
-                  <tr><th>Pattern</th><td>{e.pattern}</td></tr>
-                  <tr><th>Lemma</th><td>{e.lemma}</td></tr>
-                  <tr><th>POS</th><td>{e.pos}</td></tr>
+                  {qacMatches.map((e, i) => (
+                    <tr key={i}>
+                      <td className="border px-1">{e.token}</td>
+                      <td className="border px-1">{e.prefix}</td>
+                      <td className="border px-1">{e.stem}</td>
+                      <td className="border px-1">{e.suffix}</td>
+                      <td className="border px-1">{e.root}</td>
+                      <td className="border px-1">{e.pattern}</td>
+                      <td className="border px-1">{e.lemma}</td>
+                      <td className="border px-1">{e.pos}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-            </div>
-          ))}
-        </section>
-      )}
+            )
+          }
+
+          <h3 className="mt-4 font-semibold">Verses for Root</h3>
+          {qacVerses.length === 0
+            ? <p>No verses found</p>
+            : (
+              <ul className="list-disc list-inside">
+                {qacVerses.map((v, i) => (
+                  <li key={i}>{v}</li>
+                ))}
+              </ul>
+            )
+          }
+        </div>
+
+        {/* Nemlar Results */}
+        <div>
+          <h2 className="text-lg font-semibold mb-2">Nemlar Analysis</h2>
+          {nemlarMatches.length === 0
+            ? <p>No Nemlar matches</p>
+            : (
+              <table className="w-full text-sm border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-1">file</th>
+                    <th className="border px-1">sentId</th>
+                    <th className="border px-1">token</th>
+                    <th className="border px-1">prefix</th>
+                    <th className="border px-1">stem</th>
+                    <th className="border px-1">suffix</th>
+                    <th className="border px-1">root</th>
+                    <th className="border px-1">pattern</th>
+                    <th className="border px-1">lemma</th>
+                    <th className="border px-1">pos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nemlarMatches.map((e, i) => (
+                    <tr key={i}>
+                      <td className="border px-1">{e.filename}</td>
+                      <td className="border px-1">{e.sentenceId}</td>
+                      <td className="border px-1">{e.token}</td>
+                      <td className="border px-1">{e.prefix}</td>
+                      <td className="border px-1">{e.stem}</td>
+                      <td className="border px-1">{e.suffix}</td>
+                      <td className="border px-1">{e.root}</td>
+                      <td className="border px-1">{e.pattern}</td>
+                      <td className="border px-1">{e.lemma}</td>
+                      <td className="border px-1">{e.pos}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          }
+        </div>
+      </div>
     </div>
   );
 }
