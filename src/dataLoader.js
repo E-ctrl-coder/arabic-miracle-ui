@@ -1,62 +1,42 @@
-// src/dataLoader.js
-import JSZip from 'jszip';
+import JSZip from "jszip";
+import { XMLParser } from "fast-xml-parser";
 
-// Parse a single QAC line into { surface, tags }
-function parseLine(line) {
-  // Split on tab: first element is the word, the rest are morphological tags
-  const parts = line.split('\t');
-  return {
-    surface: parts[0],
-    tags: parts.slice(1),
-  };
+/**
+ * Fetch the raw QAC text.
+ */
+export async function fetchQAC() {
+  const res = await fetch("/qac.txt");
+  if (!res.ok) throw new Error(`QAC fetch failed: ${res.status}`);
+  return await res.text();
 }
 
-export async function loadQAC() {
-  console.log('[loadQAC] → fetching /qac.txt');
-  const res = await fetch('/qac.txt');
-  if (!res.ok) {
-    console.error('[loadQAC] fetch failed:', res.status);
-    return [];
-  }
-
-  const raw = await res.text();
-  console.log('[loadQAC] raw length:', raw.length);
-
-  // Split into lines, trim whitespace, remove blanks and comment lines
-  const lines = raw
-    .split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l !== '' && !l.startsWith('#'));
-
-  console.log('[loadQAC] lines after filter:', lines.length);
-
-  // Map to token objects
-  const tokens = lines.map(parseLine);
-  console.log('[loadQAC] parsed tokens count:', tokens.length);
-
-  return tokens;
-}
-
-export async function loadNemlar() {
-  console.log('[loadNemlar] → fetching /nemlar.zip');
-  const res = await fetch('/nemlar.zip');
-  if (!res.ok) {
-    console.error('[loadNemlar] fetch failed:', res.status);
-    return [];
-  }
-
+/**
+ * Fetch, unzip, and parse the Nemlar XML files.
+ */
+export async function fetchNemlar() {
+  const res = await fetch("/nemlar.zip");
+  if (!res.ok) throw new Error(`Nemlar fetch failed: ${res.status}`);
   const blob = await res.blob();
   const zip = await JSZip.loadAsync(blob);
-  const entries = Object.entries(zip.files);
-  console.log('[loadNemlar] zip entries:', entries.map(([name]) => name));
+  const parser = new XMLParser({ ignoreAttributes: false });
 
-  const docs = await Promise.all(
-    entries.map(async ([name, file]) => ({
-      name,
-      text: await file.async('text'),
-    }))
+  const corpora = {};
+  await Promise.all(
+    Object.keys(zip.files).map(async (filename) => {
+      const text = await zip.files[filename].async("text");
+      corpora[filename] = parser.parse(text);
+    })
   );
-  console.log('[loadNemlar] documents count:', docs.length);
+  return corpora;
+}
 
-  return docs;
+/**
+ * Load both corpora in parallel.
+ */
+export async function loadCorpora() {
+  const [qacText, nemlarData] = await Promise.all([
+    fetchQAC(),
+    fetchNemlar(),
+  ]);
+  return { qacText, nemlarData };
 }
