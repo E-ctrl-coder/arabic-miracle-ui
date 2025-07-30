@@ -104,3 +104,9 @@ export async function loadCorpora() {
 
   return { qacEntries, rootIndex, nemlarEntries };
 }
+
+  const { entries: qacEntries, rootIndex } = parseQAC(qacText);
+  const nemlarEntries = await parseNemlar(nemlarBlob);
+
+  return { qacEntries, rootIndex, nemlarEntries };
+}
