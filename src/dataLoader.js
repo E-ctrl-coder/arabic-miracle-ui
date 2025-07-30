@@ -16,20 +16,27 @@ async function fetchNemlarZip() {
   return res.blob();
 }
 
-/** Parse QAC text → { entries, rootIndex } */
+/**
+ * Parse QAC text safely → { entries, rootIndex }
+ * Skips any line that doesn’t have exactly 7 tab-separated fields.
+ */
 function parseQAC(text) {
-  const lines = text.split("\n").filter((l) => l.trim() !== "");
-  const entries = lines.map((ln) => {
-    const [verseKey, token, seg, root, pattern, lemma, pos] = ln.split("\t");
-    const [prefix, stem, suffix] = seg.split("|");
-    return { verseKey, token, prefix, stem, suffix, root, pattern, lemma, pos };
-  });
+  const rawLines = text.split("\n");
+  const entries = [];
+  const rootIndex = {};
 
-  const rootIndex = entries.reduce((idx, e) => {
-    if (!idx[e.root]) idx[e.root] = new Set();
-    idx[e.root].add(e.verseKey);
-    return idx;
-  }, {});
+  rawLines.forEach((ln) => {
+    const parts = ln.split("\t");
+    if (parts.length !== 7) return;             // drop malformed or empty lines
+
+    const [verseKey, token, seg, root, pattern, lemma, pos] = parts;
+    const [prefix = "", stem = "", suffix = ""] = seg.split("|");
+
+    entries.push({ verseKey, token, prefix, stem, suffix, root, pattern, lemma, pos });
+
+    if (!rootIndex[root]) rootIndex[root] = new Set();
+    rootIndex[root].add(verseKey);
+  });
 
   return { entries, rootIndex };
 }
