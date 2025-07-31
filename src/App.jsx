@@ -1,6 +1,5 @@
-// src/App.jsx
 import React, { useState, useEffect } from "react";
-import { loadQAC, loadNemlar } from "./dataLoader";
+import { loadQAC, loadNemlar, stripDiacritics } from "./dataLoader";
 import WordDisplay from "./components/WordDisplay";
 import "./index.css";
 
@@ -35,27 +34,31 @@ export default function App() {
       console.log("🎯 loadQAC → entries:", entries.length);
       console.log("🎯 loadNemlar → entries:", nemEntries.length);
 
+      // Normalize query
+      const normQuery = stripDiacritics(query.trim());
+
+      // Log a few tokens for inspection
+      console.log("🔍 Sample QAC tokens:", entries.slice(0, 5).map(e => e.token));
+      console.log("🔍 Sample Nemlar tokens:", nemEntries.slice(0, 5).map(e => e.token));
+
       // QAC token matches
-     const normQuery = query.trim();
-const qacMatches = entries.filter((e) =>
-  e.token.trim() === normQuery
-);
+      const qacMatches = entries.filter((e) =>
+        stripDiacritics(e.token.trim()) === normQuery
+      );
       console.log("QAC token matches:", qacMatches.length);
       setQacRes({ entries: qacMatches, rootIndex });
 
       // Verses for that root
       const root = qacMatches[0]?.root;
       console.log("Root for matched token:", root);
-      const verseList = root
-        ? Array.from(rootIndex[root]).sort()
-        : [];
+      const verseList = root ? Array.from(rootIndex[root]).sort() : [];
       console.log("Verses for root:", verseList);
       setVerses(verseList);
 
       // Nemlar token matches
       const nemMatches = nemEntries.filter((e) =>
-  e.token.trim() === normQuery
-);
+        stripDiacritics(e.token.trim()) === normQuery
+      );
       console.log("Nemlar token matches:", nemMatches.length);
       setNemRes(nemMatches);
     } catch (err) {
@@ -164,5 +167,5 @@ const qacMatches = entries.filter((e) =>
         </div>
       </div>
     </div>
-);
+  );
 }
