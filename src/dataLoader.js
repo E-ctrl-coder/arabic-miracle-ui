@@ -12,145 +12,140 @@ import { XMLParser } from "fast-xml-parser";
 export function normalizeArabic(str = "") {
   return str
     .normalize("NFC")
-    // strip tashkeel & tatweel
-    .replace(/[\u0610-\u061A\u064B-\u065F\u06D6-\u06ED\u0640]/g, "")
-    // unify alefs
-    .replace(/[إأآ]/g, "ا")
-    // alef-maqsura → ya
-    .replace(/ى/g, "ي")
-    // ta marbūṭa → heh
-    .replace(/ة/g, "ه")
-    // hamza variants → base
-    .replace(/ؤ/g, "و")
+    .replace(/[\u0610-\u061A\u064B-\u065F\u06D6-\u06ED\u0640]/g, "") // diacritics & kashida
+    .replace(/[إأآ]/g, "ا")                                        // alef variants
+    .replace(/ى/g, "ي")                                           // maqsura → ya
+    .replace(/ة/g, "ه")                                           // tāʾ marbūṭa → heh
+    .replace(/ؤ/g, "و")                                           // hamza variants
     .replace(/ئ/g, "ي")
-    // strip everything outside Arabic block
-    .replace(/[^ء-ي]/g, "");
+    .replace(/[^ء-ي]/g, "");                                      // strip non-Arabic
 }
 
-/**
- - Buckwalter → Arabic mapping
- - Source: https://corpus.quran.com/buckwalter.html
-*/
+/** Buckwalter → Arabic map (QAC v0.4) */
 const BW2AR = {
-  "'": "ء", "|": "آ", ">": "أ", "&": "ؤ", "<": "إ", "}": "ئ",
-  "A": "ا", "b": "ب", "p": "ة", "t": "ت", "v": "ث", "j": "ج",
-  "H": "ح", "x": "خ", "d": "د", "": "ذ", "r": "ر", "z": "ز",
-  "s": "س", "$": "ش", "S": "ص", "D": "ض", "T": "ط", "Z": "ظ",
-  "E": "ع", "g": "غ", "f": "ف", "q": "ق", "k": "ك", "l": "ل",
-  "m": "م", "n": "ن", "h": "ه", "w": "و", "Y": "ى", "y": "ي",
-  "F": "ً", "N": "ٌ", "K": "ٍ", "a": "َ", "u": "ُ", "i": "ِ",
-  "~": "ْ", "o": "ّ", "`": "ٰ"
+  "'":"ء","|":"آ",">":"أ","&":"ؤ","<":"إ","}":"ئ",
+  "A":"ا","b":"ب","p":"ة","t":"ت","v":"ث","j":"ج",
+  "H":"ح","x":"خ","d":"د","":"ذ","r":"ر","z":"ز",
+  "s":"س","$":"ش","S":"ص","D":"ض","T":"ط","Z":"ظ",
+  "E":"ع","g":"غ","f":"ف","q":"ق","k":"ك","l":"ل",
+  "m":"م","n":"ن","h":"ه","w":"و","Y":"ى","y":"ي",
+  "F":"ً","N":"ٌ","K":"ٍ","a":"َ","u":"ُ","i":"ِ",
+  "~":"ْ","o":"ّ","`":"ٰ"
 };
-
 function buckwalterToArabic(bw) {
   return bw.split("").map(ch => BW2AR[ch] || ch).join("");
 }
 
-const ARABIC_DIACRITICS = /[\u0617-\u061A\u064B-\u0652]/g;
-export function stripDiacritics(text) {
-  return text.replace(ARABIC_DIACRITICS, "");
-}
-
 async function fetchQACText() {
-  const res = await fetch("/qac.txt");
-  if (!res.ok) throw new Error(`QAC fetch failed: ${res.status}`);
-  return await res.text();
+  let text = await fetch("/qac.txt").then(r => {
+    if (!r.ok) throw new Error(`QAC fetch failed: ${r.status}`);
+    return r.text();
+  });
+  // strip BOM so lines starting with '#' are correctly recognized
+  text = text.replace(/^\uFEFF/, "");
+  return text;
 }
 
 async function fetchNemlarZip() {
   const res = await fetch("/nemlar.zip");
   if (!res.ok) throw new Error(`Nemlar fetch failed: ${res.status}`);
-  return await res.blob();
+  return res.blob();
 }
 
 /**
- * Parse QAC v0.4 (4-column Buckwalter file)
- * - Builds entries: { location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot }
- * - Builds rootIndex: { [normRoot]: [location,…] }
+ * Parse QAC v0.4 → entries + rootIndex
+ * Each entry now has `normToken` & `normRoot`.
+ * We skip any entries where normToken is empty.
  */
 function parseQAC(text) {
-  const lines = text.split("\n");
+  const lines = text.split(/\r?\n/);
   const entries = [];
   const rootIndex = {};
+
+  // Inspect the very first non-# lines for debugging
+  const sampleLines = lines.filter(l => l.trim() && !l.startsWith("#")).slice(0, 5);
+  console.log("▶︎ sample QAC lines:", sampleLines);
 
   lines.forEach((ln, idx) => {
     if (!ln.trim() || ln.startsWith("#")) return;
     const parts = ln.split("\t");
     if (parts.length !== 4) {
-      console.log(`parseQAC: skipping line ${idx + 1} (${parts.length} fields)`);
+      console.log(`parseQAC skip line ${idx + 1}: has ${parts.length} cols`);
       return;
     }
-
     const [location, bwForm, , feats] = parts;
     const token = buckwalterToArabic(bwForm);
     const featParts = feats.split("|");
 
-    let prefix = "", stem = "", suffix = "", root = "", lemma = "", pos = "", pattern = "";
+    // extract morph slots
+    let prefix="", stem="", suffix="", root="", lemma="", pos="", pattern="";
 
-    featParts.forEach((f, i) => {
+    featParts.forEach((f,i) => {
       if (f === "PREFIX") {
-        prefix = buckwalterToArabic((featParts[i + 1] || "").replace(/\+$/, ""));
+        prefix = buckwalterToArabic((featParts[i+1]||"").replace(/\+$/,""));
       }
       if (f === "SUFFIX") {
-        suffix = buckwalterToArabic((featParts[i + 1] || "").replace(/\+$/, ""));
+        suffix = buckwalterToArabic((featParts[i+1]||"").replace(/\+$/,""));
       }
-      if (f.startsWith("POS:")) pos = f.split(":")[1];
-      if (f.startsWith("LEM:")) lemma = buckwalterToArabic(f.split(":")[1] || "");
-      if (f.startsWith("ROOT:")) root = buckwalterToArabic(f.split(":")[1] || "");
-      if (f.startsWith("PAT:") || f.startsWith("PATTERN:")) {
-        pattern = f.split(":")[1] || "";
+      if (f.startsWith("POS:"))   pos     = f.split(":")[1];
+      if (f.startsWith("LEM:"))   lemma   = buckwalterToArabic(f.split(":")[1]||"");
+      if (f.startsWith("ROOT:"))  root    = buckwalterToArabic(f.split(":")[1]||"");
+      if (f.startsWith("PAT:")||f.startsWith("PATTERN:")) {
+        pattern = f.split(":")[1]||"";
       }
     });
 
     // derive stem
     stem = token;
     if (prefix && stem.startsWith(prefix)) stem = stem.slice(prefix.length);
-    if (suffix && stem.endsWith(suffix)) stem = stem.slice(0, stem.length - suffix.length);
+    if (suffix && stem.endsWith(suffix))   stem = stem.slice(0, stem.length - suffix.length);
 
-    // compute normalized forms
+    // normalized forms
     const normToken = normalizeArabic(token);
-    const normRoot = normalizeArabic(root);
+    const normRoot  = normalizeArabic(root);
 
-    entries.push({
-      location, token, prefix, stem, suffix, root, pattern, lemma, pos,
-      normToken, normRoot
-    });
+    // skip empties
+    if (!normToken) return;
+
+    entries.push({location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot});
 
     if (normRoot) {
-      rootIndex[normRoot] = rootIndex[normRoot] || new Set();
+      rootIndex[normRoot] = rootIndex[normRoot]||new Set();
       rootIndex[normRoot].add(location);
     }
   });
 
-  // turn sets → sorted arrays
+  // finalize rootIndex arrays
   Object.keys(rootIndex).forEach(r => {
     rootIndex[r] = Array.from(rootIndex[r]).sort();
   });
 
-  console.log("parseQAC: total entries", entries.length);
-  return { entries, rootIndex };
+  console.log("parseQAC: total entries after filter:", entries.length);
+  return {entries, rootIndex};
 }
 
-/** Parse Nemlar ZIP → flat array of annotation objects with normToken */
+/** Parse Nemlar XML → flat array with normToken */
 async function parseNemlar(blob) {
   const zip = await JSZip.loadAsync(blob);
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "$" });
+  const parser = new XMLParser({ignoreAttributes:false, attributeNamePrefix:"$"});
   const entries = [];
 
   await Promise.all(
-    Object.entries(zip.files).map(async ([filename, file]) => {
-      const xml = await file.async("text");
+    Object.entries(zip.files).map(async ([fname, file]) => {
+      if (!fname.endsWith(".xml")) return;
+      const xml  = await file.async("text");
       const json = parser.parse(xml);
-      const sentences = json.FILE?.sentence ?? [];
-      const list = Array.isArray(sentences) ? sentences : [sentences];
+      const sents = json.FILE?.sentence ?? [];
+      const list  = Array.isArray(sents) ? sents : [sents];
 
       list.forEach(sent => {
         const anns = Array.isArray(sent.annotation) ? sent.annotation : [sent.annotation];
         anns.forEach(a => {
-          const token = a._text;
+          const token    = a._text;
           const normToken = normalizeArabic(token);
+          if (!normToken) return;
           entries.push({
-            filename,
+            filename: fname,
             sentenceId: sent.$.id,
             token, prefix: a.$.prefix, stem: a.$.stem,
             suffix: a.$.suffix, root: a.$.root,
@@ -162,13 +157,13 @@ async function parseNemlar(blob) {
     })
   );
 
-  console.log("parseNemlar: total entries", entries.length);
+  console.log("parseNemlar: total entries:", entries.length);
   return entries;
 }
 
 export async function loadQAC() {
-  const text = await fetchQACText();
-  return parseQAC(text);
+  const txt = await fetchQACText();
+  return parseQAC(txt);
 }
 
 export async function loadNemlar() {
@@ -178,5 +173,5 @@ export async function loadNemlar() {
 
 export async function loadCorpora() {
   const [qacData, nemData] = await Promise.all([loadQAC(), loadNemlar()]);
-  return { ...qacData, nemlarEntries: nemData };
+  return {...qacData, nemlarEntries: nemData};
 }
