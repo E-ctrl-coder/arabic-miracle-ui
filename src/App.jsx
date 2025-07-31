@@ -1,5 +1,6 @@
+// src/App.jsx
 import React, { useState, useEffect } from "react";
-import { loadQAC, loadNemlar, stripDiacritics } from "./dataLoader";
+import { loadQAC, loadNemlar, normalizeArabic } from "./dataLoader";
 import WordDisplay from "./components/WordDisplay";
 import "./index.css";
 
@@ -34,31 +35,34 @@ export default function App() {
       console.log("🎯 loadQAC → entries:", entries.length);
       console.log("🎯 loadNemlar → entries:", nemEntries.length);
 
-      // Normalize query
-      const normQuery = stripDiacritics(query.trim());
+      // Normalize the user query
+      const normQuery = normalizeArabic(query.trim());
+      console.log("Normalized query:", normQuery);
 
-      // Log a few tokens for inspection
-      console.log("🔍 Sample QAC tokens:", entries.slice(0, 5).map(e => e.token));
-      console.log("🔍 Sample Nemlar tokens:", nemEntries.slice(0, 5).map(e => e.token));
-
-      // QAC token matches
-      const qacMatches = entries.filter((e) =>
-        stripDiacritics(e.token.trim()) === normQuery
+      // Log a few normalized tokens for inspection
+      console.log(
+        "🔍 Sample QAC normTokens:",
+        entries.slice(0, 5).map((e) => e.normToken)
       );
+      console.log(
+        "🔍 Sample Nemlar normTokens:",
+        nemEntries.slice(0, 5).map((e) => e.normToken)
+      );
+
+      // QAC token matches by normalized token
+      const qacMatches = entries.filter((e) => e.normToken === normQuery);
       console.log("QAC token matches:", qacMatches.length);
       setQacRes({ entries: qacMatches, rootIndex });
 
-      // Verses for that root
-      const root = qacMatches[0]?.root;
-      console.log("Root for matched token:", root);
-      const verseList = root ? Array.from(rootIndex[root]).sort() : [];
+      // Verses for that normalized root
+      const rootKey = qacMatches[0]?.normRoot || "";
+      console.log("Normalized root for matches:", rootKey);
+      const verseList = rootKey ? rootIndex[rootKey] || [] : [];
       console.log("Verses for root:", verseList);
       setVerses(verseList);
 
-      // Nemlar token matches
-      const nemMatches = nemEntries.filter((e) =>
-        stripDiacritics(e.token.trim()) === normQuery
-      );
+      // Nemlar matches by normalized token
+      const nemMatches = nemEntries.filter((e) => e.normToken === normQuery);
       console.log("Nemlar token matches:", nemMatches.length);
       setNemRes(nemMatches);
     } catch (err) {
@@ -85,7 +89,7 @@ export default function App() {
       {error && <div className="text-red-600">{error}</div>}
 
       <div className="grid grid-cols-2 gap-6">
-        {/* QAC */}
+        {/* QAC Analysis */}
         <div>
           <h2 className="text-lg font-semibold mb-2">QAC Analysis</h2>
           {qacRes.entries.length === 0 && <p>No QAC matches</p>}
@@ -133,7 +137,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Nemlar */}
+        {/* Nemlar Analysis */}
         <div>
           <h2 className="text-lg font-semibold mb-2">Nemlar Analysis</h2>
           {nemRes.length === 0 && <p>No Nemlar matches</p>}
