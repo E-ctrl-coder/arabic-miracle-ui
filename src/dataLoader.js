@@ -26,7 +26,7 @@ export function normalizeArabic(str = "") {
 const BW2AR = {
   "'": "ء", "|": "آ", ">": "أ", "&": "ؤ", "<": "إ", "}": "ئ",
   A: "ا", b: "ب", p: "ة", t: "ت", v: "ث", j: "ج",
-  H: "ح", x: "خ", d: "د", "": "ذ", r: "ر", z: "ز",
+  H: "ح", x: "خ", d: "د", '"': "ذ", r: "ر", z: "ز",
   s: "س", $: "ش", S: "ص", D: "ض", T: "ط", Z: "ظ",
   E: "ع", g: "غ", f: "ف", q: "ق", k: "ك", l: "ل",
   m: "م", n: "ن", h: "ه", w: "و", Y: "ى", y: "ي",
@@ -41,8 +41,7 @@ async function fetchQACText() {
   const res = await fetch("/qac.txt");
   if (!res.ok) throw new Error(`QAC fetch failed: ${res.status}`);
   let txt = await res.text();
-  // Remove BOM so headers (# or LOCATION) are detected
-  return txt.replace(/^\uFEFF/, "");
+  return txt.replace(/^\uFEFF/, ""); // strip BOM
 }
 
 async function fetchNemlarZip() {
@@ -53,15 +52,13 @@ async function fetchNemlarZip() {
 
 /**
  * Parse QAC v0.4 into { entries, rootIndex }
- * - Strips out the header line (LOCATION	TOKEN	TAG	FEATURES)
- * - Skips any entry whose normalized token is empty
  */
 function parseQAC(text) {
   const lines = text.split(/\r?\n/);
   const entries = [];
   const rootIndex = {};
 
-  // Log first few non-header lines for your inspection
+  // sample log
   const samples = lines
     .filter(l => l.trim() && !l.startsWith("#") && !l.startsWith("LOCATION\t"))
     .slice(0, 5);
@@ -125,62 +122,62 @@ function parseQAC(text) {
 
 /**
  * Parse Nemlar ZIP (XML and/or JSON) into flat array of entries
- * Each entry has a `normToken` for matching
- * 
- * Temporarily logs two deeper levels of the first XML file's keys,
- * then skips XML parsing until we know the correct path.
  */
 async function parseNemlar(blob) {
   const zip = await JSZip.loadAsync(blob);
-  const filenames = Object.keys(zip.files);
-  console.log("🔍 nemlar.zip contains:", filenames);
-
-  // group attrs in a.$, text in a._text
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "",
     attributesGroupName: "$",
     textNodeName: "_text"
   });
-
   const entries = [];
-  let loggedXmlShape = false;
 
   await Promise.all(
-    filenames.map(async (fname) => {
+    Object.keys(zip.files).map(async (fname) => {
+      if (!/\.(xml|json)$/i.test(fname)) return;
       const file = zip.files[fname];
-      if (!file || !/\.(xml|json)$/i.test(fname)) return;
       const text = await file.async("string");
 
+      // XML files
       if (fname.toLowerCase().endsWith(".xml")) {
         const json = parser.parse(text);
+        const sentences = json.NEMLAR?.FILE?.sentence;
+        if (!sentences) return;
+        const sentArr = Array.isArray(sentences) ? sentences : [sentences];
 
-        if (!loggedXmlShape) {
-          // top‐level under root
-          const topKeys = Object.keys(json);
-          console.log("⛳️ XML top-level keys in json:", topKeys);
+        sentArr.forEach(sentence => {
+          const sid = sentence.$?.id || "";
+          const anns = sentence.annotation;
+          if (!anns) return;
+          const annArr = Array.isArray(anns) ? anns : [anns];
 
-          // first depth (json.NEMLAR)
-          const rootKey = topKeys[0];
-          const level2 = json[rootKey] || {};
-          const level2Keys = Object.keys(level2);
-          console.log(`⛳️ Nested keys under json.${rootKey}:`, level2Keys);
+          annArr.forEach(ann => {
+            const g = ann.$?.g || "";
+            const a = ann.$?.a || "";
+            const normToken = normalizeArabic(a);
+            if (!normToken) return;
+            entries.push({
+              filename: fname,
+              sentenceId: sid,
+              token: a,
+              prefix: "",
+              stem: "",
+              suffix: "",
+              root: "",
+              pattern: "",
+              lemma: "",
+              pos: "",
+              g,
+              normToken
+            });
+          });
+        });
 
-          // second depth (json.NEMLAR.FILE)
-          if (level2Keys.length) {
-            const secondKey = level2Keys[0];
-            const level3 = level2[secondKey] || {};
-            console.log(`⛳️ Nested keys under json.${rootKey}.${secondKey}:`, Object.keys(level3));
-          }
-
-          loggedXmlShape = true;
-        }
-
-        // skip actual XML‐>entries until we know correct path
         return;
       }
 
-      // JSON branch (unchanged)
+      // JSON files
       let docs;
       try {
         docs = JSON.parse(text);
@@ -188,8 +185,8 @@ async function parseNemlar(blob) {
         console.log(`parseNemlar: invalid JSON in ${fname}`);
         return;
       }
-      const arr = Array.isArray(docs) ? docs : [];
-      arr.forEach(doc => {
+      const docsArr = Array.isArray(docs) ? docs : [];
+      docsArr.forEach(doc => {
         const id = doc.id || doc.sentenceId || "";
         (doc.tokens || []).forEach(t => {
           const token = t.token || "";
@@ -199,13 +196,13 @@ async function parseNemlar(blob) {
             filename: fname,
             sentenceId: id,
             token,
-            prefix: t.prefix,
-            stem: t.stem,
-            suffix: t.suffix,
-            root: t.root,
-            pattern: t.pattern,
-            lemma: t.lemma,
-            pos: t.pos,
+            prefix: t.prefix || "",
+            stem: t.stem || "",
+            suffix: t.suffix || "",
+            root: t.root || "",
+            pattern: t.pattern || "",
+            lemma: t.lemma || "",
+            pos: t.pos || "",
             normToken
           });
         });
@@ -231,5 +228,9 @@ export async function loadNemlar() {
 
 export async function loadCorpora() {
   const [qacData, nemData] = await Promise.all([loadQAC(), loadNemlar()]);
-  return { ...qacData, nemlarEntries: nemData };
+  return { 
+    entries: qacData.entries,
+    rootIndex: qacData.rootIndex,
+    nemlarEntries: nemData 
+  };
 }
