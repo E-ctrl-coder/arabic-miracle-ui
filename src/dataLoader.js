@@ -228,9 +228,17 @@ export async function loadNemlar() {
 
 export async function loadCorpora() {
   const [qacData, nemData] = await Promise.all([loadQAC(), loadNemlar()]);
-  return { 
+  return {
     entries: qacData.entries,
     rootIndex: qacData.rootIndex,
-    nemlarEntries: nemData 
+    nemlarEntries: nemData
   };
+}
+
+// --------------------------------------------------
+// Debug helper: expose these to window for console
+if (typeof window !== "undefined") {
+  window.loadQAC      = loadQAC;
+  window.loadNemlar   = loadNemlar;
+  window.loadCorpora  = loadCorpora;
 }
