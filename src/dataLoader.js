@@ -126,10 +126,12 @@ function parseQAC(text) {
 /**
  * Parse Nemlar ZIP (XML and/or JSON) into flat array of entries
  * Each entry has a `normToken` for matching
+ * 
+ * Temporarily logs two deeper levels of the first XML file's keys,
+ * then skips XML parsing until we know the correct path.
  */
 async function parseNemlar(blob) {
   const zip = await JSZip.loadAsync(blob);
-
   const filenames = Object.keys(zip.files);
   console.log("🔍 nemlar.zip contains:", filenames);
 
@@ -142,33 +144,39 @@ async function parseNemlar(blob) {
   });
 
   const entries = [];
-  // only log the first XML’s shape once
   let loggedXmlShape = false;
 
   await Promise.all(
     filenames.map(async (fname) => {
       const file = zip.files[fname];
       if (!file || !/\.(xml|json)$/i.test(fname)) return;
-
       const text = await file.async("string");
 
       if (fname.toLowerCase().endsWith(".xml")) {
         const json = parser.parse(text);
 
-        // log top-level and one level deeper just once
         if (!loggedXmlShape) {
+          // top‐level under root
           const topKeys = Object.keys(json);
           console.log("⛳️ XML top-level keys in json:", topKeys);
 
+          // first depth (json.NEMLAR)
           const rootKey = topKeys[0];
-          console.log(
-            `⛳️ Nested keys under json.${rootKey}:`,
-            Object.keys(json[rootKey] || {})
-          );
+          const level2 = json[rootKey] || {};
+          const level2Keys = Object.keys(level2);
+          console.log(`⛳️ Nested keys under json.${rootKey}:`, level2Keys);
+
+          // second depth (json.NEMLAR.FILE)
+          if (level2Keys.length) {
+            const secondKey = level2Keys[0];
+            const level3 = level2[secondKey] || {};
+            console.log(`⛳️ Nested keys under json.${rootKey}.${secondKey}:`, Object.keys(level3));
+          }
 
           loggedXmlShape = true;
         }
-        // skip actual parsing until we know the real path
+
+        // skip actual XML‐>entries until we know correct path
         return;
       }
 
