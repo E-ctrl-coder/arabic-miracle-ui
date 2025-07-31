@@ -236,3 +236,13 @@ if (typeof window !== "undefined") {
   window.loadNemlar  = loadNemlar;
   window.loadCorpora = loadCorpora;
 }
+// Expose for debugging in DevTools
+if (typeof window !== "undefined") {
+  window.JSZip = JSZip;
+  window.inspectNemlarZip = async () => {
+    const blob = await fetchNemlarZip();
+    const zip = await JSZip.loadAsync(blob);
+    console.log("ZIP entries →", Object.keys(zip.files));
+    return zip;
+  };
+}
