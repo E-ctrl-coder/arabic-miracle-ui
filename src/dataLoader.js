@@ -152,6 +152,7 @@ async function parseNemlar(blob) {
 
       if (fname.toLowerCase().endsWith(".xml")) {
         const json = parser.parse(text);
+        console.log("⛳️ parsed XML for", fname, ":", json);
         const sents = json.FILE?.sentence ?? [];
         const list = Array.isArray(sents) ? sents : [sents];
 
