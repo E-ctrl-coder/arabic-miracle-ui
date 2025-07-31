@@ -36,7 +36,10 @@ export default function App() {
       console.log("🎯 loadNemlar → entries:", nemEntries.length);
 
       // QAC token matches
-      const qacMatches = entries.filter((x) => x.token === query);
+     const normQuery = query.trim();
+const qacMatches = entries.filter((e) =>
+  e.token.trim() === normQuery
+);
       console.log("QAC token matches:", qacMatches.length);
       setQacRes({ entries: qacMatches, rootIndex });
 
@@ -50,7 +53,9 @@ export default function App() {
       setVerses(verseList);
 
       // Nemlar token matches
-      const nemMatches = nemEntries.filter((x) => x.token === query);
+      const nemMatches = nemEntries.filter((e) =>
+  e.token.trim() === normQuery
+);
       console.log("Nemlar token matches:", nemMatches.length);
       setNemRes(nemMatches);
     } catch (err) {
