@@ -142,6 +142,8 @@ async function parseNemlar(blob) {
   });
 
   const entries = [];
+  // only log the first XML’s shape once
+  let loggedXmlShape = false;
 
   await Promise.all(
     filenames.map(async (fname) => {
@@ -152,65 +154,54 @@ async function parseNemlar(blob) {
 
       if (fname.toLowerCase().endsWith(".xml")) {
         const json = parser.parse(text);
-        console.log("⛳️ parsed XML for", fname, ":", json);
-        const sents = json.FILE?.sentence ?? [];
-        const list = Array.isArray(sents) ? sents : [sents];
 
-        list.forEach(sent => {
-          const anns = Array.isArray(sent.annotation)
-            ? sent.annotation
-            : [sent.annotation];
-          anns.forEach(a => {
-            const token = a._text || "";
-            const normToken = normalizeArabic(token);
-            if (!normToken) return;
-            entries.push({
-              filename: fname,
-              sentenceId: sent.$?.id || "",
-              token,
-              prefix: a.$.prefix,
-              stem: a.$.stem,
-              suffix: a.$.suffix,
-              root: a.$.root,
-              pattern: a.$.pattern,
-              lemma: a.$.lemma,
-              pos: a.$.pos,
-              normToken
-            });
-          });
-        });
+        // log top-level and one level deeper just once
+        if (!loggedXmlShape) {
+          const topKeys = Object.keys(json);
+          console.log("⛳️ XML top-level keys in json:", topKeys);
 
-      } else {
-        let docs;
-        try {
-          docs = JSON.parse(text);
-        } catch {
-          console.log(`parseNemlar: invalid JSON in ${fname}`);
-          return;
+          const rootKey = topKeys[0];
+          console.log(
+            `⛳️ Nested keys under json.${rootKey}:`,
+            Object.keys(json[rootKey] || {})
+          );
+
+          loggedXmlShape = true;
         }
-        const arr = Array.isArray(docs) ? docs : [];
-        arr.forEach(doc => {
-          const id = doc.id || doc.sentenceId || "";
-          (doc.tokens || []).forEach(t => {
-            const token = t.token || "";
-            const normToken = normalizeArabic(token);
-            if (!normToken) return;
-            entries.push({
-              filename: fname,
-              sentenceId: id,
-              token,
-              prefix: t.prefix,
-              stem: t.stem,
-              suffix: t.suffix,
-              root: t.root,
-              pattern: t.pattern,
-              lemma: t.lemma,
-              pos: t.pos,
-              normToken
-            });
+        // skip actual parsing until we know the real path
+        return;
+      }
+
+      // JSON branch (unchanged)
+      let docs;
+      try {
+        docs = JSON.parse(text);
+      } catch {
+        console.log(`parseNemlar: invalid JSON in ${fname}`);
+        return;
+      }
+      const arr = Array.isArray(docs) ? docs : [];
+      arr.forEach(doc => {
+        const id = doc.id || doc.sentenceId || "";
+        (doc.tokens || []).forEach(t => {
+          const token = t.token || "";
+          const normToken = normalizeArabic(token);
+          if (!normToken) return;
+          entries.push({
+            filename: fname,
+            sentenceId: id,
+            token,
+            prefix: t.prefix,
+            stem: t.stem,
+            suffix: t.suffix,
+            root: t.root,
+            pattern: t.pattern,
+            lemma: t.lemma,
+            pos: t.pos,
+            normToken
           });
         });
-      }
+      });
     })
   );
 
