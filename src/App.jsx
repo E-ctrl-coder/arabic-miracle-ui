@@ -1,13 +1,24 @@
 // src/App.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { loadQAC, loadNemlar } from "./dataLoader";
+import WordDisplay from "./components/WordDisplay";
+import "./index.css";
 
 export default function App() {
   const [query, setQuery] = useState("");
   const [qacRes, setQacRes] = useState({ entries: [], rootIndex: {} });
   const [nemRes, setNemRes] = useState([]);
   const [verses, setVerses] = useState([]);
+  const [translations, setTranslations] = useState({});
   const [error, setError] = useState("");
+
+  // Load translations once
+  useEffect(() => {
+    fetch("/translations.json")
+      .then((res) => res.json())
+      .then(setTranslations)
+      .catch(console.error);
+  }, []);
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -21,23 +32,25 @@ export default function App() {
         loadNemlar(),
       ]);
 
-      console.log("loadQAC returned entries:", entries.length);
-      console.log("loadNemlar returned entries:", nemEntries.length);
+      console.log("🎯 loadQAC → entries:", entries.length);
+      console.log("🎯 loadNemlar → entries:", nemEntries.length);
 
-      const qacMatches = entries.filter((e) => e.token === query);
+      // QAC token matches
+      const qacMatches = entries.filter((x) => x.token === query);
       console.log("QAC token matches:", qacMatches.length);
       setQacRes({ entries: qacMatches, rootIndex });
 
+      // Verses for that root
       const root = qacMatches[0]?.root;
       console.log("Root for matched token:", root);
-
       const verseList = root
         ? Array.from(rootIndex[root]).sort()
         : [];
       console.log("Verses for root:", verseList);
       setVerses(verseList);
 
-      const nemMatches = nemEntries.filter((e) => e.token === query);
+      // Nemlar token matches
+      const nemMatches = nemEntries.filter((x) => x.token === query);
       console.log("Nemlar token matches:", nemMatches.length);
       setNemRes(nemMatches);
     } catch (err) {
@@ -64,6 +77,7 @@ export default function App() {
       {error && <div className="text-red-600">{error}</div>}
 
       <div className="grid grid-cols-2 gap-6">
+        {/* QAC */}
         <div>
           <h2 className="text-lg font-semibold mb-2">QAC Analysis</h2>
           {qacRes.entries.length === 0 && <p>No QAC matches</p>}
@@ -73,10 +87,7 @@ export default function App() {
                 <thead className="bg-gray-100">
                   <tr>
                     <th>token</th>
-                    <th>prefix</th>
-                    <th>stem</th>
-                    <th>suffix</th>
-                    <th>root</th>
+                    <th>morph display</th>
                     <th>pattern</th>
                     <th>lemma</th>
                     <th>pos</th>
@@ -84,12 +95,14 @@ export default function App() {
                 </thead>
                 <tbody>
                   {qacRes.entries.map((e, i) => (
-                    <tr key={i}>
+                    <tr key={i} className="border-t">
                       <td>{e.token}</td>
-                      <td>{e.prefix}</td>
-                      <td>{e.stem}</td>
-                      <td>{e.suffix}</td>
-                      <td>{e.root}</td>
+                      <td>
+                        <WordDisplay
+                          tokenData={e}
+                          translations={translations}
+                        />
+                      </td>
                       <td>{e.pattern}</td>
                       <td>{e.lemma}</td>
                       <td>{e.pos}</td>
@@ -112,6 +125,7 @@ export default function App() {
           )}
         </div>
 
+        {/* Nemlar */}
         <div>
           <h2 className="text-lg font-semibold mb-2">Nemlar Analysis</h2>
           {nemRes.length === 0 && <p>No Nemlar matches</p>}
@@ -121,28 +135,21 @@ export default function App() {
                 <tr>
                   <th>file</th>
                   <th>sentId</th>
-                  <th>token</th>
-                  <th>prefix</th>
-                  <th>stem</th>
-                  <th>suffix</th>
-                  <th>root</th>
-                  <th>pattern</th>
-                  <th>lemma</th>
+                  <th>morph display</th>
                   <th>pos</th>
                 </tr>
               </thead>
               <tbody>
                 {nemRes.map((e, i) => (
-                  <tr key={i}>
+                  <tr key={i} className="border-t">
                     <td>{e.filename}</td>
                     <td>{e.sentenceId}</td>
-                    <td>{e.token}</td>
-                    <td>{e.prefix}</td>
-                    <td>{e.stem}</td>
-                    <td>{e.suffix}</td>
-                    <td>{e.root}</td>
-                    <td>{e.pattern}</td>
-                    <td>{e.lemma}</td>
+                    <td>
+                      <WordDisplay
+                        tokenData={e}
+                        translations={translations}
+                      />
+                    </td>
                     <td>{e.pos}</td>
                   </tr>
                 ))}
@@ -152,5 +159,5 @@ export default function App() {
         </div>
       </div>
     </div>
-  );
+);
 }
