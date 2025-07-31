@@ -1,3 +1,5 @@
+// src/dataLoader.js
+
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 
@@ -31,19 +33,15 @@ const BW2AR = {
   F: "ً", N: "ٌ", K: "ٍ", a: "َ", u: "ُ", i: "ِ",
   "~": "ْ", o: "ّ", "`": "ٰ"
 };
-
 function buckwalterToArabic(bw) {
-  return bw
-    .split("")
-    .map(ch => BW2AR[ch] || ch)
-    .join("");
+  return bw.split("").map(ch => BW2AR[ch] || ch).join("");
 }
 
 async function fetchQACText() {
   const res = await fetch("/qac.txt");
   if (!res.ok) throw new Error(`QAC fetch failed: ${res.status}`);
   let txt = await res.text();
-  return txt.replace(/^\uFEFF/, ""); // strip BOM
+  return txt.replace(/^\uFEFF/, "");
 }
 
 async function fetchNemlarZip() {
@@ -60,7 +58,7 @@ function parseQAC(text) {
   const entries = [];
   const rootIndex = {};
 
-  // sample log
+  // Log first few non-header lines
   const samples = lines
     .filter(l => l.trim() && !l.startsWith("#") && !l.startsWith("LOCATION\t"))
     .slice(0, 5);
@@ -108,12 +106,7 @@ function parseQAC(text) {
     const normRoot = normalizeArabic(root);
     if (!normToken) return;
 
-    entries.push({
-      location,
-      token, prefix, stem, suffix,
-      root, pattern, lemma, pos,
-      normToken, normRoot
-    });
+    entries.push({ location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot });
 
     if (normRoot) {
       rootIndex[normRoot] = rootIndex[normRoot] || new Set();
@@ -131,16 +124,10 @@ function parseQAC(text) {
 
 /**
  * Parse Nemlar ZIP (XML and/or JSON) into flat array of entries
+ * Uses the real path: json.NEMLAR.FILE.sentence
  */
 async function parseNemlar(blob) {
   const zip = await JSZip.loadAsync(blob);
-
-  // 1) Filter to real data files
-  const allNames = Object.keys(zip.files);
-  const filenames = allNames.filter(n => /\.(xml|json)$/i.test(n));
-  console.log("parseNemlar: data files count:", filenames.length);
-
-  // 2) fast-xml-parser setup
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "",
@@ -148,89 +135,80 @@ async function parseNemlar(blob) {
     textNodeName: "_text"
   });
 
-  // 3) DEBUG the very first XML
-  const firstXml = filenames.find(n => n.toLowerCase().endsWith(".xml"));
-  if (firstXml) {
-    const txt = await zip.files[firstXml].async("string");
-    const json = parser.parse(txt);
-    console.log("DEBUG json.NEMLAR keys:", Object.keys(json.NEMLAR || {}));
-    console.log("DEBUG json.NEMLAR.FILE keys:", Object.keys((json.NEMLAR || {}).FILE || {}));
-  } else {
-    console.log("parseNemlar: no XML file found for debugging");
-  }
-
-  // 4) Now do the real parse
   const entries = [];
+  const files = Object.values(zip.files)
+    .filter(f => /\.(xml|json)$/i.test(f.name));
 
-  await Promise.all(
-    filenames.map(async (fname) => {
-      const file = zip.files[fname];
-      const text = await file.async("string");
+  await Promise.all(files.map(async file => {
+    const text = await file.async("string");
 
-      // XML branch
-      if (fname.toLowerCase().endsWith(".xml")) {
-        const json = parser.parse(text);
-        const sents = json.NEMLAR?.FILE?.sentence;
-        if (!sents) return;
-        const list = Array.isArray(sents) ? sents : [sents];
-        list.forEach(sent => {
-          const sid = sent.$?.id || "";
-          const anns = sent.annotation
-            ? Array.isArray(sent.annotation)
-              ? sent.annotation
-              : [sent.annotation]
-            : [];
-          anns.forEach(a => {
-            const token = a._text || "";
-            const norm = normalizeArabic(token);
-            if (!norm) return;
-            entries.push({
-              filename: fname,
-              sentenceId: sid,
-              token,
-              prefix: a.$?.prefix || "",
-              stem: a.$?.stem || "",
-              suffix: a.$?.suffix || "",
-              root: a.$?.root || "",
-              pattern: a.$?.pattern || "",
-              lemma: a.$?.lemma || "",
-              pos: a.$?.pos || "",
-              normToken: norm
-            });
+    if (file.name.toLowerCase().endsWith(".xml")) {
+      const json = parser.parse(text);
+      const sents = json.NEMLAR?.FILE?.sentence;
+      if (!sents) return;
+
+      const list = Array.isArray(sents) ? sents : [sents];
+      list.forEach(sent => {
+        const sid = sent.$?.id || "";
+        const anns = sent.annotation
+          ? Array.isArray(sent.annotation)
+            ? sent.annotation
+            : [sent.annotation]
+          : [];
+
+        anns.forEach(a => {
+          const token = a._text || "";
+          const norm = normalizeArabic(token);
+          if (!norm) return;
+
+          entries.push({
+            filename: file.name,
+            sentenceId: sid,
+            token,
+            prefix: a.$?.prefix || "",
+            stem: a.$?.stem || "",
+            suffix: a.$?.suffix || "",
+            root: a.$?.root || "",
+            pattern: a.$?.pattern || "",
+            lemma: a.$?.lemma || "",
+            pos: a.$?.pos || "",
+            normToken: norm
           });
         });
+      });
 
+    } else {
       // JSON branch
-      } else {
-        let docs = [];
-        try { docs = JSON.parse(text); }
-        catch { return; }
-        const arr = Array.isArray(docs) ? docs : [];
-        arr.forEach(doc => {
-          const id = doc.id || doc.sentenceId || "";
-          (doc.tokens || []).forEach(t => {
-            const norm = normalizeArabic(t.token || "");
-            if (!norm) return;
-            entries.push({
-              filename: fname,
-              sentenceId: id,
-              token: t.token || "",
-              prefix: t.prefix || "",
-              stem: t.stem || "",
-              suffix: t.suffix || "",
-              root: t.root || "",
-              pattern: t.pattern || "",
-              lemma: t.lemma || "",
-              pos: t.pos || "",
-              normToken: norm
-            });
+      let docs = [];
+      try { docs = JSON.parse(text); }
+      catch { return; }
+
+      const arr = Array.isArray(docs) ? docs : [];
+      arr.forEach(doc => {
+        const id = doc.id || doc.sentenceId || "";
+        (doc.tokens || []).forEach(t => {
+          const norm = normalizeArabic(t.token || "");
+          if (!norm) return;
+
+          entries.push({
+            filename: file.name,
+            sentenceId: id,
+            token: t.token,
+            prefix: t.prefix || "",
+            stem: t.stem || "",
+            suffix: t.suffix || "",
+            root: t.root || "",
+            pattern: t.pattern || "",
+            lemma: t.lemma || "",
+            pos: t.pos || "",
+            normToken: norm
           });
         });
-      }
-    })
-  );
+      });
+    }
+  }));
 
-  console.log("parseNemlar: total entries:", entries.length);
+  console.log("parseNemlar: total entries after filter:", entries.length);
   return entries;
 }
 
@@ -247,19 +225,11 @@ export async function loadNemlar() {
 }
 
 export async function loadCorpora() {
-  const [qacData, nemData] = await Promise.all([
-    loadQAC(),
-    loadNemlar()
-  ]);
-  return {
-    entries: qacData.entries,
-    rootIndex: qacData.rootIndex,
-    nemlarEntries: nemData
-  };
+  const [qacData, nemData] = await Promise.all([loadQAC(), loadNemlar()]);
+  return { ...qacData, nemlarEntries: nemData };
 }
 
-// --------------------------------------------------
-// Debug helper: expose these to window for console
+// Debug helper: expose for console
 
 if (typeof window !== "undefined") {
   window.loadQAC     = loadQAC;
