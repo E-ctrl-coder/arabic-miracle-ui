@@ -1,6 +1,6 @@
-// src/App.jsx
 import React, { useState, useEffect } from "react";
 import { loadQAC, loadNemlar, normalizeArabic } from "./dataLoader";
+import { buildRootMap, fallbackByRoot } from "./utils/fallbackMatcher";
 import WordDisplay from "./components/WordDisplay";
 import "./index.css";
 
@@ -39,7 +39,6 @@ export default function App() {
       const normQuery = normalizeArabic(query.trim());
       console.log("Normalized query:", normQuery);
 
-      // Log a few normalized tokens for inspection
       console.log(
         "🔍 Sample QAC normTokens:",
         entries.slice(0, 5).map((e) => e.normToken)
@@ -61,10 +60,22 @@ export default function App() {
       console.log("Verses for root:", verseList);
       setVerses(verseList);
 
-      // Nemlar matches by normalized token
-      const nemMatches = nemEntries.filter((e) => e.normToken === normQuery);
-      console.log("Nemlar token matches:", nemMatches.length);
-      setNemRes(nemMatches);
+      // Build a root → entries map for Nemlar fallback
+      const nemlarRootMap = buildRootMap(nemEntries);
+
+      // Exact Nemlar matches by normalized token
+      const exactNemMatches = nemEntries.filter(
+        (e) => e.normToken === normQuery
+      );
+      console.log("Nemlar token matches:", exactNemMatches.length);
+
+      // Fallback to root-based matches if none found
+      const finalNemMatches =
+        exactNemMatches.length > 0
+          ? exactNemMatches
+          : fallbackByRoot(normQuery, nemlarRootMap);
+      console.log("Nemlar fallback matches:", finalNemMatches.length);
+      setNemRes(finalNemMatches);
     } catch (err) {
       console.error("Search error:", err);
       setError(err.message);
@@ -171,5 +182,4 @@ export default function App() {
         </div>
       </div>
     </div>
-  );
-}
+);
