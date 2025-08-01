@@ -55,8 +55,9 @@ function parseQAC(text) {
   const entries = [];
   const rootIndex = {};
 
-  lines.forEach((line, idx) => {
-    if (!line || line.startsWith("#") || line.startsWith("LOCATION\t")) return;
+  lines.forEach((line) => {
+    if (!line || line.startsWith("#") || line.startsWith("LOCATION\t"))
+      return;
     const parts = line.split("\t");
     if (parts.length !== 4) return;
 
@@ -122,45 +123,47 @@ async function parseNemlar(blob) {
 
   const entries = [];
 
-  await Promise.all(Object.values(zip.files)
-    .filter(f => f.name.toLowerCase().endsWith(".xml") && !f.dir)
-    .map(async file => {
-      const text = await file.async("string");
-      const json = parser.parse(text);
-      const sents = json.NEMLAR?.FILE?.sentence || [];
+  await Promise.all(
+    Object.values(zip.files)
+      .filter(f => f.name.toLowerCase().endsWith(".xml") && !f.dir)
+      .map(async file => {
+        const text = await file.async("string");
+        const json = parser.parse(text);
+        const sents = json.NEMLAR?.FILE?.sentence || [];
+        const list = Array.isArray(sents) ? sents : [sents];
 
-      const list = Array.isArray(sents) ? sents : [sents];
-      list.forEach(sent => {
-        const sid = sent.$?.id || "";
-        const anns = sent.annotation?.ArabicLexical || [];
-        const annList = Array.isArray(anns) ? anns : [anns];
+        list.forEach(sent => {
+          const sid = sent.$?.id || "";
+          const anns = sent.annotation?.ArabicLexical || [];
+          const annList = Array.isArray(anns) ? anns : [anns];
 
-        annList.forEach(a => {
-          const tok = a.$?.word || "";
-          const norm = normalizeArabic(tok);
-          if (!norm) return;
+          annList.forEach(a => {
+            const tok = a.$?.word || "";
+            const norm = normalizeArabic(tok);
+            if (!norm) return;
 
-          entries.push({
-            sentenceId: sid,
-            token: tok,
-            prefix: a.$?.prefix || "",
-            stem: "", // not exposed in Nemlar
-            suffix: a.$?.suffix || "",
-            root: a.$?.root || "",
-            pattern: a.$?.pattern || "",
-            lemma: a.$?.lemma || "",
-            pos: a.$?.pos || "",
-            normToken: norm
+            entries.push({
+              sentenceId: sid,
+              filename: file.name,
+              token: tok,
+              prefix: a.$?.prefix || "",
+              stem: "", // not exposed in Nemlar
+              suffix: a.$?.suffix || "",
+              root: a.$?.root || "",
+              pattern: a.$?.pattern || "",
+              lemma: a.$?.lemma || "",
+              pos: a.$?.pos || "",
+              normToken: norm
+            });
           });
         });
-      });
-    }));
+      })
+  );
 
   return entries;
 }
 
 // Public API
-
 export async function loadQAC() {
   const txt = await fetchQACText();
   return parseQAC(txt);
@@ -173,7 +176,8 @@ export async function loadNemlar() {
 
 export async function loadCorpora() {
   const [qacData, nemlarEntries] = await Promise.all([
-    loadQAC(), loadNemlar()
+    loadQAC(),
+    loadNemlar()
   ]);
   return {
     entries: qacData.entries,
@@ -183,7 +187,6 @@ export async function loadCorpora() {
 }
 
 // Debug helpers
-
 if (typeof window !== "undefined") {
   window.loadQAC     = loadQAC;
   window.loadNemlar  = loadNemlar;
