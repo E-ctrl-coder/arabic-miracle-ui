@@ -1,3 +1,4 @@
+// src/dataLoader.js
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 
@@ -56,8 +57,7 @@ function parseQAC(text) {
   const rootIndex = {};
 
   lines.forEach((line) => {
-    if (!line || line.startsWith("#") || line.startsWith("LOCATION\t"))
-      return;
+    if (!line || line.startsWith("#") || line.startsWith("LOCATION\t")) return;
     const parts = line.split("\t");
     if (parts.length !== 4) return;
 
@@ -69,41 +69,39 @@ function parseQAC(text) {
 
     featParts.forEach((f, i) => {
       if (f === "PREFIX")
-        prefix = buckwalterToArabic((featParts[i + 1] || "").replace(/\+$/, ""));
+        prefix = buckwalterToArabic((featParts[i+1]||"").replace(/\+$/,""));
       if (f === "SUFFIX")
-        suffix = buckwalterToArabic((featParts[i + 1] || "").replace(/\+$/, ""));
+        suffix = buckwalterToArabic((featParts[i+1]||"").replace(/\+$/,""));
       if (f.startsWith("ROOT:"))
-        root = buckwalterToArabic(f.split(":")[1] || "");
-      if (f.startsWith("PAT:") || f.startsWith("PATTERN:"))
-        pattern = f.split(":")[1] || "";
+        root = buckwalterToArabic(f.split(":")[1]||"");
+      if (f.startsWith("PAT:")||f.startsWith("PATTERN:"))
+        pattern = f.split(":")[1]||"";
       if (f.startsWith("LEM:"))
-        lemma = buckwalterToArabic(f.split(":")[1] || "");
+        lemma = buckwalterToArabic(f.split(":")[1]||"");
       if (f.startsWith("POS:"))
-        pos = f.split(":")[1] || "";
+        pos = f.split(":")[1]||"";
     });
 
     stem = token;
     if (prefix && stem.startsWith(prefix)) stem = stem.slice(prefix.length);
-    if (suffix && stem.endsWith(suffix)) stem = stem.slice(0, stem.length - suffix.length);
+    if (suffix && stem.endsWith(suffix)) stem = stem.slice(0, stem.length-suffix.length);
 
     const normToken = normalizeArabic(token);
-    const normRoot = normalizeArabic(root);
+    const normRoot  = normalizeArabic(root);
     if (!normToken) return;
 
-    entries.push({
-      location, token, prefix, stem, suffix,
-      root, pattern, lemma, pos,
-      normToken, normRoot
-    });
+    entries.push({ location, token, prefix, stem, suffix,
+                   root, pattern, lemma, pos,
+                   normToken, normRoot });
 
     if (normRoot) {
-      rootIndex[normRoot] = rootIndex[normRoot] || new Set();
-      rootIndex[normRoot].add(location);
+      rootIndex[normRoot] = rootIndex[normRoot]||[];
+      rootIndex[normRoot].push(location);
     }
   });
 
-  Object.keys(rootIndex).forEach(r => {
-    rootIndex[r] = Array.from(rootIndex[r]).sort();
+  Object.keys(rootIndex).forEach((r) => {
+    rootIndex[r].sort();
   });
 
   return { entries, rootIndex };
@@ -122,10 +120,9 @@ async function parseNemlar(blob) {
   });
 
   const entries = [];
-
   await Promise.all(
     Object.values(zip.files)
-      .filter(f => f.name.toLowerCase().endsWith(".xml") && !f.dir)
+      .filter(f => f.name.endsWith(".xml") && !f.dir)
       .map(async file => {
         const text = await file.async("string");
         const json = parser.parse(text);
@@ -141,13 +138,12 @@ async function parseNemlar(blob) {
             const tok = a.$?.word || "";
             const norm = normalizeArabic(tok);
             if (!norm) return;
-
             entries.push({
               sentenceId: sid,
               filename: file.name,
               token: tok,
               prefix: a.$?.prefix || "",
-              stem: "", // not exposed in Nemlar
+              stem: "",      // not in Nemlar
               suffix: a.$?.suffix || "",
               root: a.$?.root || "",
               pattern: a.$?.pattern || "",
@@ -164,25 +160,46 @@ async function parseNemlar(blob) {
 }
 
 // Public API
+
 export async function loadQAC() {
   const txt = await fetchQACText();
   return parseQAC(txt);
 }
 
 export async function loadNemlar() {
-  const blob = await fetchNemlarZip();
-  return parseNemlar(blob);
+  // 1) parse all entries
+  const entries = await parseNemlar(await fetchNemlarZip());
+
+  // 2) build exact-token index
+  const tokenIndex = {};
+  entries.forEach((e) => {
+    const key = normalizeArabic(e.token);
+    if (!tokenIndex[key]) tokenIndex[key] = [];
+    tokenIndex[key].push(e);
+  });
+
+  // 3) build root-index (fallback)
+  const rootIndex = {};
+  entries.forEach((e) => {
+    // if root tag is empty, fall back to token
+    const raw = e.root && e.root.trim() ? e.root : e.token;
+    const key = normalizeArabic(raw);
+    if (!key) return;
+    if (!rootIndex[key]) rootIndex[key] = [];
+    rootIndex[key].push(e);
+  });
+
+  return { entries, tokenIndex, rootIndex };
 }
 
 export async function loadCorpora() {
-  const [qacData, nemlarEntries] = await Promise.all([
-    loadQAC(),
-    loadNemlar()
-  ]);
+  const [qacData, nemData] = await Promise.all([loadQAC(), loadNemlar()]);
   return {
-    entries: qacData.entries,
-    rootIndex: qacData.rootIndex,
-    nemlarEntries
+    qacEntries: qacData.entries,
+    qacRoots:   qacData.rootIndex,
+    nemEntries: nemData.entries,
+    nemTokens:  nemData.tokenIndex,
+    nemRoots:   nemData.rootIndex
   };
 }
 
