@@ -1,7 +1,9 @@
+// src/utils/fallbackMatcher.js
+
 import { normalizeArabic } from "../dataLoader.js";
 
 /**
- * Strip definite article, leading particles, pronoun suffixes, and diacritics
+ * Strip particles, definite article, pronoun suffixes, and diacritics
  * so surface forms and roots align for matching.
  *
  * @param {string} word
@@ -9,13 +11,16 @@ import { normalizeArabic } from "../dataLoader.js";
  */
 export function cleanSurface(word) {
   return normalizeArabic(word)
-    .replace(/^ال/, "")              // remove definite article
-    .replace(/^[وفبلك]+/, "")       // remove leading particles
-    .replace(/(ه|ها|هم|نا|كم|كن)$/, ""); // remove pronoun suffixes
+    // remove definite article
+    .replace(/^ال/, "")
+    // remove leading particles (و ف ب ل ك)
+    .replace(/^[وفبلك]+/, "")
+    // remove common pronoun suffixes
+    .replace(/(ه|ها|هم|نا|كم|كن)$/, "");
 }
 
 /**
- * Build a Map<normalizedRoot, Array<entry>> at startup.
+ * Build a Map<root, Array<entry>> using normalized roots.
  *
  * @param {Array<object>} nemlarEntries
  * @returns {Map<string, Array<object>>}
@@ -24,6 +29,7 @@ export function buildRootMap(nemlarEntries) {
   const map = new Map();
 
   nemlarEntries.forEach((entry) => {
+    // normalize the root exactly as we clean surface words
     const normRoot = cleanSurface(entry.root || "");
     if (!normRoot) return;
 
@@ -37,7 +43,7 @@ export function buildRootMap(nemlarEntries) {
 }
 
 /**
- * Find all Nemlar entries whose normalized root
+ * Fallback: find all Nemlar entries whose normalized root
  * appears in the cleaned surface form of the input word.
  *
  * @param {string} word
@@ -54,7 +60,7 @@ export function fallbackByRoot(word, rootMap) {
     }
   }
 
-  // Deduplicate by sentenceId + token
+  // Deduplicate on sentenceId + token (or any unique combo)
   const seen = new Set();
   return hits.filter((e) => {
     const key = `${e.sentenceId || ""}-${e.token || ""}`;
