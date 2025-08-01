@@ -1,175 +1,98 @@
-// src/App.jsx
 import React, { useState, useEffect } from "react";
 import { loadQAC, loadNemlar, normalizeArabic } from "./dataLoader";
 import WordDisplay from "./components/WordDisplay";
 import "./index.css";
 
 export default function App() {
-  const [query, setQuery] = useState("");
-  const [qacRes, setQacRes] = useState({ entries: [], rootIndex: {} });
-  const [nemRes, setNemRes] = useState([]);
-  const [verses, setVerses] = useState([]);
   const [translations, setTranslations] = useState({});
-  const [error, setError] = useState("");
+  const [qacEntries, setQacEntries] = useState([]);
+  const [qacRootIndex, setQacRootIndex] = useState({});
+  const [nemTokenIndex, setNemTokenIndex] = useState({});
+  const [nemRootIndex, setNemRootIndex] = useState({});
+  const [qacMatches, setQacMatches] = useState([]);
+  const [nemlarMatches, setNemlarMatches] = useState([]);
+  const [verses, setVerses] = useState([]);
 
-  // Load translations once
   useEffect(() => {
-    fetch("/translations.json")
-      .then((res) => res.json())
+    fetch((process.env.PUBLIC_URL || "") + "/translations.json")
+      .then(r => r.json())
       .then(setTranslations)
       .catch(console.error);
   }, []);
 
-  async function handleSearch(e) {
-    e.preventDefault();
+  const handleSearch = async (e) => {
+    e?.preventDefault();
     console.clear();
-    setError("");
-    console.log("Searching for token:", query);
 
-    try {
-      // Load QAC + Nemlar (with tokenIndex & rootIndex)
-      const [
-        { entries: qacEntries, rootIndex: qacRootIndex },
-        { entries: nemEntries, tokenIndex: nemTokenIndex, rootIndex: nemRootIndex },
-      ] = await Promise.all([loadQAC(), loadNemlar()]);
+    const [qac, nem] = await Promise.all([loadQAC(), loadNemlar()]);
+    setQacEntries(qac.entries);
+    setQacRootIndex(qac.rootIndex);
+    setNemTokenIndex(nem.tokenIndex);
+    setNemRootIndex(nem.rootIndex);
 
-      console.log("🎯 loadQAC → entries:", qacEntries.length);
-      console.log("🎯 loadNemlar → entries:", nemEntries.length);
-
-      // Normalize the user query
-      const normQuery = normalizeArabic(query.trim());
-      console.log("Normalized query:", normQuery);
-
-      // Inspect samples
-      console.log(
-        "🔍 Sample QAC normTokens:",
-        qacEntries.slice(0, 5).map((e) => e.normToken)
-      );
-      console.log(
-        "🔍 Sample Nemlar normTokens:",
-        nemEntries.slice(0, 5).map((e) => e.normToken)
-      );
-
-      // QAC token matches
-      const qacMatches = qacEntries.filter((e) => e.normToken === normQuery);
-      console.log("QAC token matches:", qacMatches.length);
-      setQacRes({ entries: qacMatches, rootIndex: qacRootIndex });
-
-      // Verses for QAC root
-      const rootKey = qacMatches[0]?.normRoot || "";
-      console.log("Normalized root for matches:", rootKey);
-      const verseList = rootKey ? qacRootIndex[rootKey] || [] : [];
-      console.log("Verses for root:", verseList);
-      setVerses(verseList);
-
-      // Nemlar exact-token lookup
-      const exactNemMatches = nemTokenIndex[normQuery] || [];
-      console.log("Nemlar token matches:", exactNemMatches.length);
-
-      // Fallback by root if no direct hits
-      const finalNemMatches =
-        exactNemMatches.length > 0
-          ? exactNemMatches
-          : nemRootIndex[normQuery] || [];
-      console.log("Nemlar fallback matches:", finalNemMatches.length);
-      setNemRes(finalNemMatches);
-    } catch (err) {
-      console.error("Search error:", err);
-      setError(err.message);
+    const norm = normalizeArabic(e?.target?.elements?.query?.value ?? "");
+    if (!norm) {
+      setQacMatches([]); setNemlarMatches([]); setVerses([]); return;
     }
-  }
+
+    const qMatches = qac.entries.filter(x => x.normToken === norm);
+    setQacMatches(qMatches);
+    const root = qMatches[0]?.normRoot || "";
+    const verseList = root ? (qac.rootIndex[root] || []) : [];
+    setVerses(verseList);
+
+    const exactNem = nem.tokenIndex[norm] ?? [];
+    const fallNem = nem.rootIndex[norm] ?? [];
+    setNemlarMatches(exactNem.length ? exactNem : fallNem);
+  };
 
   return (
     <div className="p-6 space-y-6">
-      <form onSubmit={handleSearch} className="flex space-x-2">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Enter Arabic word"
-          className="border px-2 py-1 flex-grow"
-        />
-        <button type="submit" className="bg-blue-600 text-white px-4">
-          Analyze
-        </button>
+      <form onSubmit={handleSearch} className="input-container">
+        <input name="query" placeholder="أدخل كلمة عربية" />
+        <button type="submit">تحليل Analyze</button>
       </form>
 
-      {error && <div className="text-red-600">{error}</div>}
-
-      <div className="grid grid-cols-2 gap-6">
-        {/* QAC Analysis */}
-        <div>
-          <h2 className="text-lg font-semibold mb-2">QAC Analysis</h2>
-          {qacRes.entries.length === 0 && <p>No QAC matches</p>}
-          {qacRes.entries.length > 0 && (
+      <div className="corpus-comparison">
+        <div className="corpus-column">
+          <h2>QAC Analysis</h2>
+          {qacMatches.length === 0 ? <p>لا توجد نتائج QAC</p> :
             <>
-              <table className="w-full text-sm border">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th>token</th>
-                    <th>morph display</th>
-                    <th>pattern</th>
-                    <th>lemma</th>
-                    <th>pos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {qacRes.entries.map((e, i) => (
-                    <tr key={i} className="border-t">
-                      <td>{e.token}</td>
-                      <td>
-                        <WordDisplay tokenData={e} translations={translations} />
-                      </td>
-                      <td>{e.pattern}</td>
-                      <td>{e.lemma}</td>
-                      <td>{e.pos}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <h3 className="mt-4 font-semibold">Verses for Root</h3>
-              {verses.length === 0 ? (
-                <p>No verses found</p>
-              ) : (
-                <ul className="list-disc list-inside">
-                  {verses.map((v, i) => (
-                    <li key={i}>{v}</li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Nemlar Analysis */}
-        <div>
-          <h2 className="text-lg font-semibold mb-2">Nemlar Analysis</h2>
-          {nemRes.length === 0 && <p>No Nemlar matches</p>}
-          {nemRes.length > 0 && (
-            <table className="w-full text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th>file</th>
-                  <th>sentId</th>
-                  <th>morph display</th>
-                  <th>pos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nemRes.map((e, i) => (
-                  <tr key={i} className="border-t">
-                    <td>{e.filename}</td>
-                    <td>{e.sentenceId}</td>
-                    <td>
-                      <WordDisplay tokenData={e} translations={translations} />
-                    </td>
+              <table><thead>
+                <tr><th>Token</th><th>Display</th><th>Pattern</th><th>Lemma</th><th>POS</th></tr>
+              </thead><tbody>
+                {qacMatches.map((e,i) =>
+                  <tr key={i}>
+                    <td>{e.token}</td>
+                    <td><WordDisplay tokenData={e} translations={translations} /></td>
+                    <td>{e.pattern}</td>
+                    <td>{e.lemma}</td>
                     <td>{e.pos}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                )}
+              </tbody></table>
+              <h3>Verses for root</h3>
+              {verses.length === 0 ? <p>No verses</p> : <ul>{verses.map((v,i)=><li key={i}>{v}</li>)}</ul>}
+            </>
+          }
+        </div>
+
+        <div className="corpus-column">
+          <h2>NEMLAR Analysis</h2>
+          {nemlarMatches.length === 0 ? <p>No Nemlar matches</p> :
+            <table><thead>
+              <tr><th>File</th><th>Sentence ID</th><th>Display</th><th>POS</th></tr>
+            </thead><tbody>
+              {nemlarMatches.map((e,i) =>
+                <tr key={i}>
+                  <td>{e.filename}</td>
+                  <td>{e.sentenceId}</td>
+                  <td><WordDisplay tokenData={e} translations={translations} /></td>
+                  <td>{e.pos}</td>
+                </tr>
+              )}
+            </tbody></table>
+          }
         </div>
       </div>
     </div>
