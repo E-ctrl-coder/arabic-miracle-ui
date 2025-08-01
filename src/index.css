@@ -1,6 +1,104 @@
-/* src/index.css */
+/* Reset and global styles */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: sans-serif;
+  direction: rtl;
+}
 
-/* Tailwind base (if using Tailwind) is already imported via postcss.config.js */
-/* Add any extra styles here */
+#root, #app {
+  width: 100%;
+  height: 100%;
+}
 
-.word >
+/* Search input and button */
+.input-container {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.input-container input[type="text"] {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px 0 0 4px;
+}
+
+.input-container button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  background: #007acc;
+  color: white;
+  cursor: pointer;
+}
+
+.input-container button:hover {
+  background: #005fa3;
+}
+
+/* Word display container */
+.word {
+  margin-bottom: 1.5rem;
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+/* Surface form */
+.surface {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+/* Details row */
+.details {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* Each corpus section */
+.corpus {
+  background: #f0f0f0;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+/* Hover-to-translate tooltip */
+.hover-translation {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+}
+
+.hover-translation span {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s linear;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.hover-translation:hover span {
+  visibility: visible;
+  opacity: 1;
+}
