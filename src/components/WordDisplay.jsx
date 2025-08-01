@@ -1,4 +1,3 @@
-// src/components/WordDisplay.jsx
 import React from "react";
 
 // Speak Arabic text
