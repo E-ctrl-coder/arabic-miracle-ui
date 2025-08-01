@@ -1,40 +1,65 @@
-// src/utils/fallbackMatcher.js
+import { normalizeArabic } from "../dataLoader.js";
 
 /**
- * Strip common prefixes, suffixes, diacritics, and "ال"
- * so surface forms from both sides align better.
+ * Strip definite article, leading particles, pronoun suffixes, and diacritics
+ * so surface forms and roots align for matching.
+ *
+ * @param {string} word
+ * @returns {string}
  */
 export function cleanSurface(word) {
-  return word
-    .replace(/^ال/, '')                // strip definite article
-    .replace(/^[وفبلك]+/, '')         // strip leading particles (و ف ب ل ك)
-    .replace(/(ه|ها|هم|نا|كم|كن)$/, '')// strip common pronoun suffixes
-    .replace(/[\u064B-\u0652]/g, '')   // strip diacritics
+  return normalizeArabic(word)
+    .replace(/^ال/, "")              // remove definite article
+    .replace(/^[وفبلك]+/, "")       // remove leading particles
+    .replace(/(ه|ها|هم|نا|كم|كن)$/, ""); // remove pronoun suffixes
 }
 
 /**
- * Build a Map<root, [nemlarEntries]> at startup
+ * Build a Map<normalizedRoot, Array<entry>> at startup.
+ *
+ * @param {Array<object>} nemlarEntries
+ * @returns {Map<string, Array<object>>}
  */
 export function buildRootMap(nemlarEntries) {
   const map = new Map();
-  nemlarEntries.forEach(entry => {
-    const root = entry.root;          // assumes entry.root is Arabic string
-    if (!map.has(root)) map.set(root, []);
-    map.get(root).push(entry);
+
+  nemlarEntries.forEach((entry) => {
+    const normRoot = cleanSurface(entry.root || "");
+    if (!normRoot) return;
+
+    if (!map.has(normRoot)) {
+      map.set(normRoot, []);
+    }
+    map.get(normRoot).push(entry);
   });
+
   return map;
 }
 
 /**
- * Try to find any Nemlar entries whose root appears in the cleaned word.
- * Returns [] if none match.
+ * Find all Nemlar entries whose normalized root
+ * appears in the cleaned surface form of the input word.
+ *
+ * @param {string} word
+ * @param {Map<string, Array<object>>} rootMap
+ * @returns {Array<object>}
  */
 export function fallbackByRoot(word, rootMap) {
-  const cleaned = cleanSurface(word);
+  const surface = cleanSurface(word);
+  const hits = [];
+
   for (const [root, entries] of rootMap.entries()) {
-    if (cleaned.includes(root)) {
-      return entries;
+    if (surface.includes(root)) {
+      hits.push(...entries);
     }
   }
-  return [];
+
+  // Deduplicate by sentenceId + token
+  const seen = new Set();
+  return hits.filter((e) => {
+    const key = `${e.sentenceId || ""}-${e.token || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
