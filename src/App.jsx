@@ -1,3 +1,4 @@
+// src/App.jsx
 import React, { useState, useEffect } from "react";
 import { loadQAC, loadNemlar, normalizeArabic } from "./dataLoader";
 import { buildRootMap, fallbackByRoot } from "./utils/fallbackMatcher";
@@ -35,7 +36,6 @@ export default function App() {
       console.log("🎯 loadQAC → entries:", entries.length);
       console.log("🎯 loadNemlar → entries:", nemEntries.length);
 
-      // Normalize the user query
       const normQuery = normalizeArabic(query.trim());
       console.log("Normalized query:", normQuery);
 
@@ -48,28 +48,23 @@ export default function App() {
         nemEntries.slice(0, 5).map((e) => e.normToken)
       );
 
-      // QAC token matches by normalized token
       const qacMatches = entries.filter((e) => e.normToken === normQuery);
       console.log("QAC token matches:", qacMatches.length);
       setQacRes({ entries: qacMatches, rootIndex });
 
-      // Verses for that normalized root
       const rootKey = qacMatches[0]?.normRoot || "";
       console.log("Normalized root for matches:", rootKey);
       const verseList = rootKey ? rootIndex[rootKey] || [] : [];
       console.log("Verses for root:", verseList);
       setVerses(verseList);
 
-      // Build a root → entries map for Nemlar fallback
       const nemlarRootMap = buildRootMap(nemEntries);
 
-      // Exact Nemlar matches by normalized token
       const exactNemMatches = nemEntries.filter(
         (e) => e.normToken === normQuery
       );
       console.log("Nemlar token matches:", exactNemMatches.length);
 
-      // Fallback to root-based matches if none found
       const finalNemMatches =
         exactNemMatches.length > 0
           ? exactNemMatches
@@ -182,4 +177,5 @@ export default function App() {
         </div>
       </div>
     </div>
-);
+  );
+}
