@@ -21,17 +21,33 @@ export function cleanSurface(word) {
 
 /**
  * Build a Map<root, Array<entry>> using normalized roots.
+ * Logs each normalized root mapping for diagnostic purposes.
  *
  * @param {Array<object>} nemlarEntries
  * @returns {Map<string, Array<object>>}
  */
 export function buildRootMap(nemlarEntries) {
   const map = new Map();
+  console.log(
+    `🚧 [buildRootMap] Starting Nemlar root map build with ${nemlarEntries.length} entries`
+  );
 
-  nemlarEntries.forEach((entry) => {
-    // normalize the root exactly as we clean surface words
-    const normRoot = cleanSurface(entry.root || "");
-    if (!normRoot) return;
+  nemlarEntries.forEach((entry, index) => {
+    const rawRoot = entry.root || "";
+    const normRoot = cleanSurface(rawRoot);
+
+    console.log(
+      `🚧 [buildRootMap] (${index + 1}/${
+        nemlarEntries.length
+      }) rawRoot='${rawRoot}' → normRoot='${normRoot}' [token='${entry.token}', sentenceId='${entry.sentenceId}', file='${entry.filename}']`
+    );
+
+    if (!normRoot) {
+      console.log(
+        `🚧 [buildRootMap] Skipped entry with empty normRoot (rawRoot='${rawRoot}')`
+      );
+      return;
+    }
 
     if (!map.has(normRoot)) {
       map.set(normRoot, []);
@@ -39,6 +55,9 @@ export function buildRootMap(nemlarEntries) {
     map.get(normRoot).push(entry);
   });
 
+  console.log(
+    `🚧 [buildRootMap] Completed. Collected ${map.size} distinct normalized roots.`
+  );
   return map;
 }
 
