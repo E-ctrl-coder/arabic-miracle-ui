@@ -5,10 +5,6 @@ import "./index.css";
 
 export default function App() {
   const [translations, setTranslations] = useState({});
-  const [qacEntries, setQacEntries] = useState([]);
-  const [qacRootIndex, setQacRootIndex] = useState({});
-  const [nemTokenIndex, setNemTokenIndex] = useState({});
-  const [nemRootIndex, setNemRootIndex] = useState({});
   const [qacMatches, setQacMatches] = useState([]);
   const [nemlarMatches, setNemlarMatches] = useState([]);
   const [verses, setVerses] = useState([]);
@@ -21,40 +17,37 @@ export default function App() {
   }, []);
 
   const handleSearch = async (e) => {
-    e?.preventDefault();
+    e.preventDefault();
     console.clear();
 
     const query = e.target.query.value.trim();
-    const normalized = normalizeArabic(query);
-    if (!normalized) {
+    const norm = normalizeArabic(query);
+
+    const [qac, nem] = await Promise.all([loadQAC(), loadNemlar()]);
+
+    if (!norm) {
       setQacMatches([]);
       setNemlarMatches([]);
       setVerses([]);
       return;
     }
 
-    const [qac, nem] = await Promise.all([loadQAC(), loadNemlar()]);
-    setQacEntries(qac.entries);
-    setQacRootIndex(qac.rootIndex);
-    setNemTokenIndex(nem.tokenIndex);
-    setNemRootIndex(nem.rootIndex);
+    const qMatches = qac.entries.filter((e) => e.normToken === norm);
+    setQacMatches(qMatches);
 
-    const qacFiltered = qac.entries.filter((e) => e.normToken === normalized);
-    setQacMatches(qacFiltered);
-
-    const root = qacFiltered[0]?.normRoot || "";
+    const root = qMatches[0]?.normRoot;
     setVerses(root ? qac.rootIndex[root] || [] : []);
 
-    const exactNem = nem.tokenIndex[normalized] || [];
-    const fallbackNem = nem.rootIndex[normalized] || [];
-    setNemlarMatches(exactNem.length > 0 ? exactNem : fallbackNem);
+    const exact = nem.tokenIndex[norm] || [];
+    const fallback = nem.rootIndex[norm] || [];
+    setNemlarMatches(exact.length ? exact : fallback);
   };
 
   return (
     <div className="p-6 space-y-6">
       <form onSubmit={handleSearch} className="input-container">
         <input name="query" placeholder="أدخل كلمة عربية" />
-        <button type="submit">تحليل Analyze</button>
+        <button type="submit">تحليل / Analyze</button>
       </form>
 
       <div className="corpus-comparison">
@@ -75,29 +68,22 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {qacMatches.map((entry, i) => (
+                  {qacMatches.map((e, i) => (
                     <tr key={i}>
-                      <td>{entry.token}</td>
-                      <td>
-                        <WordDisplay tokenData={entry} translations={translations} />
-                      </td>
-                      <td>{entry.pattern}</td>
-                      <td>{entry.lemma}</td>
-                      <td>{entry.pos}</td>
+                      <td>{e.token}</td>
+                      <td><WordDisplay tokenData={e} translations={translations} /></td>
+                      <td>{e.pattern}</td>
+                      <td>{e.lemma}</td>
+                      <td>{e.pos}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-
-              <h3>Verses for root</h3>
+              <h3>Verses for Root</h3>
               {verses.length === 0 ? (
                 <p>No verses found</p>
               ) : (
-                <ul>
-                  {verses.map((v, i) => (
-                    <li key={i}>{v}</li>
-                  ))}
-                </ul>
+                <ul>{verses.map((v, i) => <li key={i}>{v}</li>)}</ul>
               )}
             </>
           )}
@@ -118,14 +104,12 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {nemlarMatches.map((entry, i) => (
+                {nemlarMatches.map((e, i) => (
                   <tr key={i}>
-                    <td>{entry.filename}</td>
-                    <td>{entry.sentenceId}</td>
-                    <td>
-                      <WordDisplay tokenData={entry} translations={translations} />
-                    </td>
-                    <td>{entry.pos}</td>
+                    <td>{e.filename}</td>
+                    <td>{e.sentenceId}</td>
+                    <td><WordDisplay tokenData={e} translations={translations} /></td>
+                    <td>{e.pos}</td>
                   </tr>
                 ))}
               </tbody>
