@@ -1,7 +1,6 @@
 // src/App.jsx
 import React, { useState, useEffect } from "react";
 import { loadQAC, loadNemlar, normalizeArabic } from "./dataLoader";
-import { buildRootMap, fallbackByRoot } from "./utils/fallbackMatcher";
 import WordDisplay from "./components/WordDisplay";
 import "./index.css";
 
@@ -28,47 +27,50 @@ export default function App() {
     console.log("Searching for token:", query);
 
     try {
-      const [{ entries, rootIndex }, nemEntries] = await Promise.all([
-        loadQAC(),
-        loadNemlar(),
-      ]);
+      // Load QAC + Nemlar (with tokenIndex & rootIndex)
+      const [
+        { entries: qacEntries, rootIndex: qacRootIndex },
+        { entries: nemEntries, tokenIndex: nemTokenIndex, rootIndex: nemRootIndex },
+      ] = await Promise.all([loadQAC(), loadNemlar()]);
 
-      console.log("🎯 loadQAC → entries:", entries.length);
+      console.log("🎯 loadQAC → entries:", qacEntries.length);
       console.log("🎯 loadNemlar → entries:", nemEntries.length);
 
+      // Normalize the user query
       const normQuery = normalizeArabic(query.trim());
       console.log("Normalized query:", normQuery);
 
+      // Inspect samples
       console.log(
         "🔍 Sample QAC normTokens:",
-        entries.slice(0, 5).map((e) => e.normToken)
+        qacEntries.slice(0, 5).map((e) => e.normToken)
       );
       console.log(
         "🔍 Sample Nemlar normTokens:",
         nemEntries.slice(0, 5).map((e) => e.normToken)
       );
 
-      const qacMatches = entries.filter((e) => e.normToken === normQuery);
+      // QAC token matches
+      const qacMatches = qacEntries.filter((e) => e.normToken === normQuery);
       console.log("QAC token matches:", qacMatches.length);
-      setQacRes({ entries: qacMatches, rootIndex });
+      setQacRes({ entries: qacMatches, rootIndex: qacRootIndex });
 
+      // Verses for QAC root
       const rootKey = qacMatches[0]?.normRoot || "";
       console.log("Normalized root for matches:", rootKey);
-      const verseList = rootKey ? rootIndex[rootKey] || [] : [];
+      const verseList = rootKey ? qacRootIndex[rootKey] || [] : [];
       console.log("Verses for root:", verseList);
       setVerses(verseList);
 
-      const nemlarRootMap = buildRootMap(nemEntries);
-
-      const exactNemMatches = nemEntries.filter(
-        (e) => e.normToken === normQuery
-      );
+      // Nemlar exact-token lookup
+      const exactNemMatches = nemTokenIndex[normQuery] || [];
       console.log("Nemlar token matches:", exactNemMatches.length);
 
+      // Fallback by root if no direct hits
       const finalNemMatches =
         exactNemMatches.length > 0
           ? exactNemMatches
-          : fallbackByRoot(normQuery, nemlarRootMap);
+          : nemRootIndex[normQuery] || [];
       console.log("Nemlar fallback matches:", finalNemMatches.length);
       setNemRes(finalNemMatches);
     } catch (err) {
@@ -116,10 +118,7 @@ export default function App() {
                     <tr key={i} className="border-t">
                       <td>{e.token}</td>
                       <td>
-                        <WordDisplay
-                          tokenData={e}
-                          translations={translations}
-                        />
+                        <WordDisplay tokenData={e} translations={translations} />
                       </td>
                       <td>{e.pattern}</td>
                       <td>{e.lemma}</td>
@@ -163,10 +162,7 @@ export default function App() {
                     <td>{e.filename}</td>
                     <td>{e.sentenceId}</td>
                     <td>
-                      <WordDisplay
-                        tokenData={e}
-                        translations={translations}
-                      />
+                      <WordDisplay tokenData={e} translations={translations} />
                     </td>
                     <td>{e.pos}</td>
                   </tr>
