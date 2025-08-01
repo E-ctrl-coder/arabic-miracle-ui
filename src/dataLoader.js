@@ -1,14 +1,13 @@
-// src/dataLoader.js
-
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 
 /**
  * normalizeArabic(str)
+ * • Normalizes NFC → removes combining marks (diacritics) using regex of Unicode Mark ranges.
+ * • Standardizes hamza forms, ta-marbuta → ha, alef variants, yeh with hamza → yeh.
+ * • Strips out all non-Arabic letters.
  *
- * • Strips Arabic diacritics & elongation (ṭashkīl), plus Tatwīl (ـ).
- * • Normalizes hamzas, alef variations, tāʾ marbūṭah → standard forms.
- * • Removes any non‑Arabic character (not in Unicode range ء‑ي).
+ * Unicode normalization + diacritic stripping is a proven technique to match forms correctly even if input contains tashkeel :contentReference[oaicite:4]{index=4}.
  */
 export function normalizeArabic(str = "") {
   return str
@@ -22,7 +21,6 @@ export function normalizeArabic(str = "") {
     .replace(/[^ء-ي]/g, "");
 }
 
-// Buckwalter → Arabic character map (for QAC v0.4)
 const BW2AR = {
   "'": "ء", "|": "آ", ">": "أ", "&": "ؤ", "<": "إ", "}": "ئ",
   A: "ا", b: "ب", p: "ة", t: "ت", v: "ث", j: "ج",
@@ -34,27 +32,17 @@ const BW2AR = {
   "~": "ْ", o: "ّ", "`": "ٰ"
 };
 
-// Converts Buckwalter‑encoded string → native Arabic
 function buckwalterToArabic(bw = "") {
   return [...bw].map((ch) => BW2AR[ch] ?? ch).join("");
 }
 
-// Unified fetch utility supporting .txt (as UTF‑8) and .zip
 async function fetchFile(path) {
   const base = process.env.PUBLIC_URL || "";
-  const res = await fetch(base + path);
-  if (!res.ok) throw new Error(`Fetch failed: ${path} (${res.status})`);
-  if (path.endsWith(".zip")) return res.blob();
-  return res.text().then((t) => t.replace(/^\uFEFF/, ""));
+  const resp = await fetch(base + path);
+  if (!resp.ok) throw new Error(`Fetch failed: ${path} (${resp.status})`);
+  return path.endsWith(".zip") ? resp.blob() : resp.text().then((t) => t.replace(/^\uFEFF/, ""));
 }
 
-/**
- * loadQAC()
- * • Fetches /public/qac.txt
- * • Converts Buckwalter to Arabic
- * • Extracts tokens with morphological features
- * • Builds `entries[]` plus rootIndex: { normRoot: Array<location> }
- */
 export async function loadQAC() {
   const text = await fetchFile("/qac.txt");
   const lines = text.split(/\r?\n/);
@@ -63,19 +51,17 @@ export async function loadQAC() {
 
   for (const ln of lines) {
     if (!ln || ln.startsWith("#") || ln.startsWith("LOCATION\t")) continue;
-    const parts = ln.split("\t");
-    if (parts.length < 4) continue;
-    const [location, bwForm, , feats] = parts;
+    const [location, bwForm, , feats] = ln.split("\t");
     const token = buckwalterToArabic(bwForm);
     const featParts = feats.split("|");
 
-    let prefix = "", suffix = "", root = "", pattern = "", lemma = "", pos = "";
+    let [prefix, suffix, root, pattern, lemma, pos] = ["", "", "", "", "", ""];
     for (let i = 0; i < featParts.length; i++) {
       const f = featParts[i];
       if (f === "PREFIX") prefix = buckwalterToArabic(featParts[i + 1] ?? "");
       if (f === "SUFFIX") suffix = buckwalterToArabic(featParts[i + 1] ?? "");
       if (f.startsWith("ROOT:")) root = buckwalterToArabic(f.slice(5));
-      if (/^(PAT|PATTERN):/.test(f)) pattern = f.split(":")[1] ?? "";
+      if (/^(PAT|PATTERN):/.test(f)) pattern = f.split(":")[1] || "";
       if (f.startsWith("LEM:")) lemma = buckwalterToArabic(f.slice(4));
       if (f.startsWith("POS:")) pos = f.slice(4);
     }
@@ -89,64 +75,43 @@ export async function loadQAC() {
     if (!normToken) continue;
 
     entries.push({ location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot });
-
-    if (normRoot) {
-      if (!rootIndex[normRoot]) rootIndex[normRoot] = [];
-      rootIndex[normRoot].push(location);
-    }
+    if (normRoot) (rootIndex[normRoot] ??= []).push(location);
   }
 
-  // Sort verse-lists for deterministic display
-  Object.keys(rootIndex).forEach((r) => rootIndex[r].sort());
+  for (const key in rootIndex) rootIndex[key].sort();
 
   return { entries, rootIndex };
 }
 
-/**
- * loadNemlar()
- * • Fetches /public/nemlar.zip
- * • Parses all XML files via fast-xml-parser
- * • Extracts `<ArabicLexical>` tokens with morphological annotations
- * • Builds:
- *    - tokenIndex: { normToken: Array<entry> }
- *    - rootIndex:  { normRootOrToken: Array<entry> } (fallback for empty root)
- */
 export async function loadNemlar() {
   const blob = await fetchFile("/nemlar.zip");
   const zip = await JSZip.loadAsync(blob);
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: "",
-    trimValues: true,
-    textNodeName: "_text"
-  });
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", trimValues: true, textNodeName: "_text" });
 
   const entries = [];
-  const xmlFiles = Object.values(zip.files).filter((f) => !f.dir && f.name.endsWith(".xml"));
+  const xmlfiles = Object.values(zip.files).filter((f) => !f.dir && f.name.endsWith(".xml"));
 
   await Promise.all(
-    xmlFiles.map(async (file) => {
-      const xmlText = await file.async("string");
-      const json = parser.parse(xmlText);
-      const sents = json.NEMLAR?.FILE?.sentence ?? [];
-      const sentArray = Array.isArray(sents) ? sents : [sents];
+    xmlfiles.map(async (f) => {
+      const text = await f.async("string");
+      const json = parser.parse(text);
+      const sentences = json.NEMLAR?.FILE?.sentence ?? [];
+      const sentArray = Array.isArray(sentences) ? sentences : [sentences];
 
       sentArray.forEach((sent) => {
         const sid = sent.id || "";
-        const anns = sent.annotation?.ArabicLexical ?? [];
-        const annList = Array.isArray(anns) ? anns : [anns];
-
+        const ann = sent.annotation?.ArabicLexical ?? [];
+        const annList = Array.isArray(ann) ? ann : [ann];
         annList.forEach((a) => {
           const tok = a.word || "";
           const normToken = normalizeArabic(tok);
           if (!normToken) return;
-
           entries.push({
             sentenceId: sid,
-            filename: file.name,
+            filename: f.name,
             token: tok,
             prefix: a.prefix || "",
-            stem: "",          // NEMLAR does not include stem
+            stem: "",
             suffix: a.suffix || "",
             root: a.root || "",
             pattern: a.pattern || "",
@@ -161,15 +126,11 @@ export async function loadNemlar() {
 
   const tokenIndex = {};
   const rootIndex = {};
-
   entries.forEach((e) => {
-    const tk = normalizeArabic(e.token);
-    (tokenIndex[tk] ??= []).push(e);
-
+    (tokenIndex[e.normToken] ??= []).push(e);
     const raw = e.root?.trim() ? e.root : e.token;
     const r = normalizeArabic(raw);
-    if (!r) return;
-    (rootIndex[r] ??= []).push(e);
+    if (r) (rootIndex[r] ??= []).push(e);
   });
 
   return { entries, tokenIndex, rootIndex };
