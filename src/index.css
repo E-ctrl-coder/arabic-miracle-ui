@@ -1,172 +1,32 @@
-/* Reset and global styles */
-html, body {
-  margin: 0;
-  padding: 0;
-  font-family: sans-serif;
-  direction: rtl;
-}
-
-#root, #app {
-  width: 100%;
-  height: 100%;
-}
-
-/* Search input and button */
-.input-container {
+/* === Side‑by‑side comparison layout === */
+.corpus-comparison {
   display: flex;
-  margin-bottom: 1rem;
-}
-
-.input-container input[type="text"] {
-  flex: 1;
-  padding: 0.5rem;
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px 0 0 4px;
-}
-
-.input-container button {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-left: none;
-  border-radius: 0 4px 4px 0;
-  background: #007acc;
-  color: white;
-  cursor: pointer;
-}
-
-.input-container button:hover {
-  background: #005fa3;
-}
-
-/* Word display container */
-.word {
-  margin-bottom: 1.5rem;
-  padding: 0.75rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  background: #fafafa;
-}
-
-/* Surface form */
-.surface {
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin-bottom: 0.5rem;
-}
-
-/* Details row */
-.details {
-  display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
-  font-size: 0.9rem;
-  color: #555;
 }
 
-/* Each corpus section */
-.corpus {
+.corpus-column {
+  flex: 1 1 48%;
+  padding: 1rem;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  min-width: 300px;
+}
+
+.corpus-column table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+
+.corpus-column th,
+.corpus-column td {
+  border: 1px solid #ccc;
+  padding: 0.25rem;
+  text-align: center;
+}
+
+.corpus-column th {
   background: #f0f0f0;
-  padding: 0.5rem;
-  border-radius: 4px;
-  margin-top: 0.5rem;
-}
-
-/* Hover-to-translate tooltip */
-.hover-translation {
-  position: relative;
-  display: inline-block;
-  cursor: help;
-}
-
-.hover-translation span {
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity 0.2s linear;
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 6px;
-  padding: 0.25rem 0.5rem;
-  background: rgba(0,0,0,0.75);
-  color: #fff;
-  font-size: 0.85rem;
-  white-space: nowrap;
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.hover-translation:hover span {
-  visibility: visible;
-  opacity: 1;
-}
-
-/* NEMLAR-specific styles */
-.nemlar-entry {
-  margin-bottom: 1rem;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #f9f9f9;
-}
-
-.nemlar-entry .sentence-id {
-  font-weight: bold;
-  color: #333;
-}
-
-.nemlar-entry .sentence-text {
-  margin-top: 0.5rem;
-  font-style: italic;
-  color: #666;
-}
-
-.nemlar-entry .annotations {
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
-  color: #444;
-}
-
-.nemlar-entry .annotations .word {
-  display: inline-block;
-  margin-right: 0.5rem;
-  padding: 0.2rem 0.4rem;
-  background: #e0e0e0;
-  border-radius: 4px;
-}
-
-/* QAC-specific styles */
-.qac-entry {
-  margin-bottom: 1rem;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #f9f9f9;
-}
-
-.qac-entry .location {
-  font-weight: bold;
-  color: #333;
-}
-
-.qac-entry .form {
-  margin-top: 0.5rem;
-  font-style: italic;
-  color: #666;
-}
-
-.qac-entry .features {
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
-  color: #444;
-}
-
-.qac-entry .features .feature {
-  display: inline-block;
-  margin-right: 0.5rem;
-  padding: 0.2rem 0.4rem;
-  background: #e0e0e0;
-  border-radius: 4px;
 }
