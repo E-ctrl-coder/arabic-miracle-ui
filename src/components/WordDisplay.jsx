@@ -11,16 +11,21 @@ function speak(text) {
 
 export default function WordDisplay({ tokenData, translations }) {
   const { prefix, stem, suffix, root } = tokenData;
+  // Combined surface word
+  const fullWord = `${prefix || ""}${stem || ""}${suffix || ""}${root || ""}`;
   // Prefer stem translation, then root
   const t = translations[stem] || translations[root] || "";
 
   return (
-    <span className="word inline-block">
+    <span
+      className="word inline-block"
+      title={t}                      // hover anywhere for translation
+      onMouseEnter={() => speak(fullWord)}
+    >
       {prefix && (
         <span
           className="prefix text-teal-600"
           title={translations[prefix] || ""}
-          onMouseEnter={() => speak(prefix)}
         >
           {prefix}
         </span>
@@ -29,7 +34,6 @@ export default function WordDisplay({ tokenData, translations }) {
         <span
           className="stem text-purple-600"
           title={translations[stem] || ""}
-          onMouseEnter={() => speak(stem)}
         >
           {stem}
         </span>
@@ -38,7 +42,6 @@ export default function WordDisplay({ tokenData, translations }) {
         <span
           className="suffix text-orange-600"
           title={translations[suffix] || ""}
-          onMouseEnter={() => speak(suffix)}
         >
           {suffix}
         </span>
@@ -47,12 +50,10 @@ export default function WordDisplay({ tokenData, translations }) {
         <span
           className="root bg-yellow-200 px-1 rounded"
           title={translations[root] || ""}
-          onMouseEnter={() => speak(root)}
         >
           {root}
         </span>
       )}
-      {/* Combined translation tooltip if you like */}
       {t && <span className="ml-1 text-sm italic">({t})</span>}
     </span>
   );
