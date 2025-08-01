@@ -3,24 +3,4 @@
 /* Tailwind base (if using Tailwind) is already imported via postcss.config.js */
 /* Add any extra styles here */
 
-.word > span {
-  position: relative;
-  cursor: pointer;
-}
-
-/* Optional: custom tooltip (if you prefer over title=) */
-.word > span:hover::after {
-  content: attr(title);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-0.5rem);
-  background: rgba(0, 0, 0, 0.75);
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  white-space: nowrap;
-  font-size: 0.75rem;
-  pointer-events: none;
-  z-index: 10;
-}
+.word >
