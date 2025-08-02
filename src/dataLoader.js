@@ -3,11 +3,9 @@ import { XMLParser } from "fast-xml-parser";
 
 /**
  * normalizeArabic(str)
- * • Normalizes NFC → removes combining marks (diacritics) using regex of Unicode Mark ranges.
- * • Standardizes hamza forms, ta-marbuta → ha, alef variants, yeh with hamza → yeh.
- * • Strips out all non-Arabic letters.
- *
- * Unicode normalization + diacritic stripping is a proven technique to match forms correctly even if input contains tashkeel :contentReference[oaicite:4]{index=4}.
+ * • Removes Arabic diacritics (tashkīl, tatwīl),
+ * • Normalizes alef variants, yā’, tā marbūṭah, hamzas,
+ * • Strips any non-Arabic characters (Unicode range ء‑ي).
  */
 export function normalizeArabic(str = "") {
   return str
@@ -21,6 +19,7 @@ export function normalizeArabic(str = "") {
     .replace(/[^ء-ي]/g, "");
 }
 
+// Buckwalter → Arabic conversion map for QAC data
 const BW2AR = {
   "'": "ء", "|": "آ", ">": "أ", "&": "ؤ", "<": "إ", "}": "ئ",
   A: "ا", b: "ب", p: "ة", t: "ت", v: "ث", j: "ج",
@@ -39,27 +38,37 @@ function buckwalterToArabic(bw = "") {
 async function fetchFile(path) {
   const base = process.env.PUBLIC_URL || "";
   const resp = await fetch(base + path);
-  if (!resp.ok) throw new Error(`Fetch failed: ${path} (${resp.status})`);
-  return path.endsWith(".zip") ? resp.blob() : resp.text().then((t) => t.replace(/^\uFEFF/, ""));
+  if (!resp.ok) throw new Error(`Failed to fetch ${path}: ${resp.status}`);
+  return path.endsWith(".zip")
+    ? resp.blob()
+    : resp.text().then((t) => t.replace(/^\uFEFF/, ""));
 }
 
 export async function loadQAC() {
-  const text = await fetchFile("/qac.txt");
-  const lines = text.split(/\r?\n/);
+  const txt = await fetchFile("/qac.txt");
+  const lines = txt.split(/\r?\n/);
   const entries = [];
   const rootIndex = {};
 
   for (const ln of lines) {
     if (!ln || ln.startsWith("#") || ln.startsWith("LOCATION\t")) continue;
-    const [location, bwForm, , feats] = ln.split("\t");
+    const parts = ln.split("\t");
+    if (parts.length < 4) continue;
+    const [location, bwForm, , feats] = parts;
     const token = buckwalterToArabic(bwForm);
     const featParts = feats.split("|");
 
-    let [prefix, suffix, root, pattern, lemma, pos] = ["", "", "", "", "", ""];
+    let prefix = "",
+      suffix = "",
+      root = "",
+      pattern = "",
+      lemma = "",
+      pos = "";
+
     for (let i = 0; i < featParts.length; i++) {
       const f = featParts[i];
-      if (f === "PREFIX") prefix = buckwalterToArabic(featParts[i + 1] ?? "");
-      if (f === "SUFFIX") suffix = buckwalterToArabic(featParts[i + 1] ?? "");
+      if (f === "PREFIX") prefix = buckwalterToArabic(featParts[i + 1] || "");
+      if (f === "SUFFIX") suffix = buckwalterToArabic(featParts[i + 1] || "");
       if (f.startsWith("ROOT:")) root = buckwalterToArabic(f.slice(5));
       if (/^(PAT|PATTERN):/.test(f)) pattern = f.split(":")[1] || "";
       if (f.startsWith("LEM:")) lemma = buckwalterToArabic(f.slice(4));
@@ -74,11 +83,24 @@ export async function loadQAC() {
     const normRoot = normalizeArabic(root);
     if (!normToken) continue;
 
-    entries.push({ location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot });
-    if (normRoot) (rootIndex[normRoot] ??= []).push(location);
+    entries.push({
+      location,
+      token,
+      prefix,
+      stem,
+      suffix,
+      root,
+      pattern,
+      lemma,
+      pos,
+      normToken,
+      normRoot
+    });
+
+    if (normRoot) rootIndex[normRoot] = rootIndex[normRoot] || [], rootIndex[normRoot].push(location);
   }
 
-  for (const key in rootIndex) rootIndex[key].sort();
+  for (const k in rootIndex) rootIndex[k].sort();
 
   return { entries, rootIndex };
 }
@@ -86,7 +108,12 @@ export async function loadQAC() {
 export async function loadNemlar() {
   const blob = await fetchFile("/nemlar.zip");
   const zip = await JSZip.loadAsync(blob);
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", trimValues: true, textNodeName: "_text" });
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "",
+    trimValues: true,
+    textNodeName: "_text"
+  });
 
   const entries = [];
   const xmlfiles = Object.values(zip.files).filter((f) => !f.dir && f.name.endsWith(".xml"));
@@ -102,10 +129,12 @@ export async function loadNemlar() {
         const sid = sent.id || "";
         const ann = sent.annotation?.ArabicLexical ?? [];
         const annList = Array.isArray(ann) ? ann : [ann];
+
         annList.forEach((a) => {
           const tok = a.word || "";
           const normToken = normalizeArabic(tok);
           if (!normToken) return;
+
           entries.push({
             sentenceId: sid,
             filename: f.name,
