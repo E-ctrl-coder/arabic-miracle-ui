@@ -36,9 +36,15 @@ export function buckwalterToArabic(bw = "") {
 }
 
 async function fetchFile(path) {
-  const base = import.meta.env.BASE_URL || "";
-  const resp = await fetch(base + path);
-  if (!resp.ok) throw new Error(`Failed to fetch ${path}: ${resp.status}`);
+  // strip trailing slash from BASE_URL
+  let base = (import.meta.env.BASE_URL || "").replace(/\/$/, "");
+  // strip leading slashes from the requested path
+  const cleanPath = path.replace(/^\/+/, "");
+  // if base is non-empty, join with a single slash
+  const url = base ? `${base}/${cleanPath}` : cleanPath;
+
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Failed to fetch ${url}: ${resp.status}`);
   return path.endsWith(".zip")
     ? resp.blob()
     : resp.text().then(t => t.replace(/^\uFEFF/, ""));
@@ -76,14 +82,31 @@ export async function loadQAC() {
     }
 
     let stem = token;
-    if (prefix && stem.startsWith(prefix)) stem = stem.slice(prefix.length);
-    if (suffix && stem.endsWith(suffix)) stem = stem.slice(0, stem.length - suffix.length);
+    if (prefix && stem.startsWith(prefix)) {
+      stem = stem.slice(prefix.length);
+    }
+    if (suffix && stem.endsWith(suffix)) {
+      stem = stem.slice(0, stem.length - suffix.length);
+    }
 
     const normToken = normalizeArabic(token);
     const normRoot = normalizeArabic(root);
     if (!normToken) continue;
 
-    entries.push({ location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot });
+    entries.push({
+      location,
+      token,
+      prefix,
+      stem,
+      suffix,
+      root,
+      pattern,
+      lemma,
+      pos,
+      normToken,
+      normRoot
+    });
+
     if (normRoot) {
       rootIndex[normRoot] = rootIndex[normRoot] || [];
       rootIndex[normRoot].push(location);
@@ -108,7 +131,9 @@ export async function loadNemlar() {
   });
 
   const entries = [];
-  const xmlfiles = Object.values(zip.files).filter(f => !f.dir && f.name.endsWith(".xml"));
+  const xmlfiles = Object.values(zip.files).filter(
+    f => !f.dir && f.name.endsWith(".xml")
+  );
 
   await Promise.all(
     xmlfiles.map(async f => {
