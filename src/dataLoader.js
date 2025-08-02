@@ -5,7 +5,7 @@ import { XMLParser } from "fast-xml-parser";
  * normalizeArabic(str)
  * • Removes Arabic diacritics (tashkīl, tatwīl),
  * • Normalizes alef variants, yā’, tā marbūṭah, hamzas,
- * • Strips any non-Arabic characters (Unicode range ء‑ي).
+ * • Strips any non-Arabic characters (Unicode range ء-ي).
  */
 export function normalizeArabic(str = "") {
   return str
@@ -32,7 +32,7 @@ const BW2AR = {
 };
 
 export function buckwalterToArabic(bw = "") {
-  return [...bw].map((ch) => BW2AR[ch] ?? ch).join("");
+  return [...bw].map(ch => BW2AR[ch] ?? ch).join("");
 }
 
 async function fetchFile(path) {
@@ -41,7 +41,7 @@ async function fetchFile(path) {
   if (!resp.ok) throw new Error(`Failed to fetch ${path}: ${resp.status}`);
   return path.endsWith(".zip")
     ? resp.blob()
-    : resp.text().then((t) => t.replace(/^\uFEFF/, ""));
+    : resp.text().then(t => t.replace(/^\uFEFF/, ""));
 }
 
 export async function loadQAC() {
@@ -67,12 +67,12 @@ export async function loadQAC() {
 
     for (let i = 0; i < featParts.length; i++) {
       const f = featParts[i];
-      if (f === "PREFIX") prefix = buckwalterToArabic(featParts[i + 1] || "");
-      if (f === "SUFFIX") suffix = buckwalterToArabic(featParts[i + 1] || "");
-      if (f.startsWith("ROOT:")) root = buckwalterToArabic(f.slice(5));
+      if (f === "PREFIX")   prefix = buckwalterToArabic(featParts[i + 1] || "");
+      if (f === "SUFFIX")   suffix = buckwalterToArabic(featParts[i + 1] || "");
+      if (f.startsWith("ROOT:"))   root = buckwalterToArabic(f.slice(5));
       if (/^(PAT|PATTERN):/.test(f)) pattern = f.split(":")[1] || "";
-      if (f.startsWith("LEM:")) lemma = buckwalterToArabic(f.slice(4));
-      if (f.startsWith("POS:")) pos = f.slice(4);
+      if (f.startsWith("LEM:"))     lemma = buckwalterToArabic(f.slice(4));
+      if (f.startsWith("POS:"))     pos   = f.slice(4);
     }
 
     let stem = token;
@@ -80,34 +80,26 @@ export async function loadQAC() {
     if (suffix && stem.endsWith(suffix)) stem = stem.slice(0, stem.length - suffix.length);
 
     const normToken = normalizeArabic(token);
-    const normRoot = normalizeArabic(root);
+    const normRoot  = normalizeArabic(root);
     if (!normToken) continue;
 
-    entries.push({
-      location,
-      token,
-      prefix,
-      stem,
-      suffix,
-      root,
-      pattern,
-      lemma,
-      pos,
-      normToken,
-      normRoot
-    });
-
-    if (normRoot) rootIndex[normRoot] = rootIndex[normRoot] || [], rootIndex[normRoot].push(location);
+    entries.push({ location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot });
+    if (normRoot) {
+      rootIndex[normRoot] = rootIndex[normRoot] || [];
+      rootIndex[normRoot].push(location);
+    }
   }
 
-  for (const k in rootIndex) rootIndex[k].sort();
+  for (const k in rootIndex) {
+    rootIndex[k].sort();
+  }
 
   return { entries, rootIndex };
 }
 
 export async function loadNemlar() {
-  const blob = await fetchFile("/nemlar.zip");
-  const zip = await JSZip.loadAsync(blob);
+  const blob   = await fetchFile("/nemlar.zip");
+  const zip    = await JSZip.loadAsync(blob);
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "",
@@ -116,22 +108,23 @@ export async function loadNemlar() {
   });
 
   const entries = [];
-  const xmlfiles = Object.values(zip.files).filter((f) => !f.dir && f.name.endsWith(".xml"));
+  const xmlfiles = Object.values(zip.files)
+    .filter(f => !f.dir && f.name.endsWith(".xml"));
 
   await Promise.all(
-    xmlfiles.map(async (f) => {
+    xmlfiles.map(async f => {
       const text = await f.async("string");
       const json = parser.parse(text);
       const sentences = json.NEMLAR?.FILE?.sentence ?? [];
       const sentArray = Array.isArray(sentences) ? sentences : [sentences];
 
-      sentArray.forEach((sent) => {
-        const sid = sent.id || "";
-        const ann = sent.annotation?.ArabicLexical ?? [];
+      sentArray.forEach(sent => {
+        const sid     = sent.id || "";
+        const ann    = sent.annotation?.ArabicLexical ?? [];
         const annList = Array.isArray(ann) ? ann : [ann];
 
-        annList.forEach((a) => {
-          const tok = a.word || "";
+        annList.forEach(a => {
+          const tok       = a.word || "";
           const normToken = normalizeArabic(tok);
           if (!normToken) return;
 
@@ -154,13 +147,20 @@ export async function loadNemlar() {
   );
 
   const tokenIndex = {};
-  const rootIndex = {};
-  entries.forEach((e) => {
-    (tokenIndex[e.normToken] ??= []).push(e);
+  const rootIndex  = {};
+
+  entries.forEach(e => {
+    (tokenIndex[e.normToken] ||= []).push(e);
     const raw = e.root?.trim() ? e.root : e.token;
-    const r = normalizeArabic(raw);
-    if (r) (rootIndex[r] ??= []).push(e);
+    const r   = normalizeArabic(raw);
+    if (r) (rootIndex[r] ||= []).push(e);
   });
 
   return { entries, tokenIndex, rootIndex };
+}
+
+// Expose loaders for console debugging
+if (typeof window !== "undefined") {
+  window.loadQAC    = loadQAC;
+  window.loadNemlar = loadNemlar;
 }
