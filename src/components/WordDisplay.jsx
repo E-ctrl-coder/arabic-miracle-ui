@@ -18,9 +18,9 @@ export default function WordDisplay({ tokenData, translations }) {
       title={t}
       onMouseEnter={() => speakSurface(surface)}
     >
-      {prefix && <span className="prefix" title={translations[prefix] || ""}>{prefix}</span>}
-      {stem && <span className="stem" title={translations[stem] || ""}>{stem}</span>}
-      {suffix && <span className="suffix" title={translations[suffix] || ""}>{suffix}</span>}
+      {prefix && <span className="prefix">{prefix}</span>}
+      {stem && <span className="stem">{stem}</span>}
+      {suffix && <span className="suffix">{suffix}</span>}
       {t && <span className="ml-1 text-sm italic">({t})</span>}
     </span>
   );
