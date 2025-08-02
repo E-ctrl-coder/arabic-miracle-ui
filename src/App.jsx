@@ -1,132 +1,69 @@
-// src/App.jsx
-import React, { useState, useEffect, useMemo } from "react";
-import { loadQAC, loadNemlar, normalizeArabic } from "./utils/dataLoader";
-import { FixedSizeList } from "react-window";
-import WordDisplay from "./components/WordDisplay";
-import "./style.css";
+import React, { useState, useEffect } from 'react';
+import { loadQacEntries, loadNemlarSentences, analyzeWord } from './utils/dataLoader';
+import './index.css';
 
-export default function App() {
-  const [qac, setQac]     = useState(null);
-  const [nem, setNem]     = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [qacMatches, setQacMatches] = useState([]);
-  const [nemMatches, setNemMatches] = useState([]);
-  const [verses, setVerses]         = useState([]);
+function App() {
+  const [qacEntries, setQacEntries]           = useState([]);
+  const [nemlarSentences, setNemlarSentences] = useState([]);
+  const [inputValue, setInputValue]           = useState('');
+  const [analysis, setAnalysis]               = useState([]);
 
   useEffect(() => {
-    Promise.all([loadQAC(), loadNemlar()])
-      .then(([qData, nData]) => {
-        setQac(qData);
-        setNem(nData);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    loadQacEntries()
+      .then(setQacEntries)
+      .catch(console.error);
+
+    loadNemlarSentences()
+      .then(setNemlarSentences)
+      .catch(console.error);
   }, []);
 
-  const handleSearch = e => {
-    e.preventDefault();
-    const raw  = query.trim();
-    const norm = normalizeArabic(raw);
-    if (!norm || loading) {
-      setQacMatches([]);
-      setNemMatches([]);
-      setVerses([]);
-      return;
-    }
-
-    let qlist = qac.tokenIndex[norm] || [];
-    if (!qlist.length) {
-      const stripped = normalizeArabic(raw.replace(/^ال/, ""));
-      qlist = qac.rootIndex[stripped]
-        ?.map(loc => qac.entries.find(e => e.location === loc))
-        || [];
-    }
-    setQacMatches(qlist);
-    setVerses(qlist[0]?.normRoot ? qac.rootIndex[qlist[0].normRoot] : []);
-
-    const nlist = nem.tokenIndex[norm] || nem.rootIndex[norm] || [];
-    setNemMatches(nlist);
-  };
-
-  const QACList = useMemo(() => (
-    <FixedSizeList
-      height={300}
-      width="100%"
-      itemCount={qacMatches.length}
-      itemSize={35}
-      style={{ overflowX: "hidden" }}
-    >
-      {({ index, style }) => {
-        const e = qacMatches[index];
-        return (
-          <div style={style} className="row">
-            <span>{e.token}</span>
-            <WordDisplay tokenData={e} />
-            <span>{e.pattern}</span>
-            <span>{e.lemma}</span>
-            <span>{e.pos}</span>
-          </div>
-        );
-      }}
-    </FixedSizeList>
-  ), [qacMatches]);
-
-  const NemList = useMemo(() => (
-    <FixedSizeList
-      height={300}
-      width="100%"
-      itemCount={nemMatches.length}
-      itemSize={35}
-      style={{ overflowX: "hidden" }}
-    >
-      {({ index, style }) => {
-        const e = nemMatches[index];
-        return (
-          <div style={style} className="row">
-            <span>{e.filename}</span>
-            <span>{e.sentenceId}</span>
-            <WordDisplay tokenData={e} />
-            <span>{e.pos}</span>
-          </div>
-        );
-      }}
-    </FixedSizeList>
-  ), [nemMatches]);
+  useEffect(() => {
+    setAnalysis(analyzeWord(inputValue, qacEntries));
+  }, [inputValue, qacEntries]);
 
   return (
-    <div className="app">
-      <h1>Arabic Morphology Analyzer</h1>
-      <form onSubmit={handleSearch} className="input-form">
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="أدخل كلمة عربية"
-          disabled={loading}
-        />
-        <button type="submit" disabled={loading || !query.trim()}>
-          Analyze
-        </button>
-      </form>
+    <div className="container">
+      <h1>Arabic Morphological Analyzer</h1>
 
-      {loading && <p>Loading corpora…</p>}
+      <input
+        type="text"
+        placeholder="Type any Arabic word"
+        value={inputValue}
+        onChange={e => setInputValue(e.target.value)}
+        className="search-bar"
+        autoFocus
+      />
 
-      {!loading && (
-        <div className="results">
-          <div className="column">
-            <h2>QAC</h2>
-            {qacMatches.length ? QACList : <p>No QAC matches</p>}
-            <h3>Verses</h3>
-            {verses.length
-              ? <ul>{verses.map(v => <li key={v}>{v}</li>)}</ul>
-              : <p>No verses found</p>}
+      <section>
+        <h2>Analysis of “{inputValue || '…'}”</h2>
+
+        {analysis.length === 0 && (
+          <p>Type something to see analysis.</p>
+        )}
+
+        {analysis.map((seg, idx) => (
+          <div key={idx} className="morph-block">
+            <strong>Segment:</strong> {seg.segment || '<unknown>'}
+
+            {seg.entries.length === 0 ? (
+              <p className="error">No QAC entry found</p>
+            ) : (
+              seg.entries.map((e, j) => (
+                <ul key={j}>
+                  <li>Token: {e.token}</li>
+                  <li>Root: {e.root}</li>
+                  <li>Pattern: {e.pattern}</li>
+                  <li>Lemma: {e.lemma}</li>
+                  <li>POS: {e.pos}</li>
+                </ul>
+              ))
+            )}
           </div>
-          <div className="column">
-            <h2>NEMLAR</h2>
-            {nemMatches.length ? NemList : <p>No NEMLAR matches</p>}
-          </div>
-        </div>
-      )}
+        ))}
+      </section>
     </div>
   );
 }
+
+export default App;

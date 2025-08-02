@@ -1,160 +1,175 @@
-// src/utils/dataLoader.js
-import JSZip from "jszip";
-import { XMLParser } from "fast-xml-parser";
+import JSZip from 'jszip';
+import { XMLParser } from 'fast-xml-parser';
 
-/**
- * normalizeArabic(str)
- *  – strips diacritics & tatwīl,
- *  – normalizes alef, yā’, tā marbūṭah, hamzas,
- *  – removes non-Arabic chars.
- */
-export function normalizeArabic(str = "") {
-  return str
-    .normalize("NFC")
-    .replace(/[\u0610-\u061A\u064B-\u065F\u06D6-\u06ED\u0640]/g, "")
-    .replace(/[إأآ]/g, "ا")
-    .replace(/ى/g, "ي")
-    .replace(/ة/g, "ه")
-    .replace(/ؤ/g, "و")
-    .replace(/ئ/g, "ي")
-    .replace(/[^ء-ي]/g, "");
+const buck2arab = {
+  "'": 'ء',  "|": 'آ',  ">": 'أ',  "&": 'ؤ',  "<": 'إ',
+  "}": 'ئ',  "A": 'ا',  b: 'ب',  p: 'ة',  t: 'ت',
+  v: 'ث',    j: 'ج',    H: 'ح',  x: 'خ',  d: 'د',
+  "*": 'ذ',  r: 'ر',    z: 'ز',  s: 'س',  $: 'ش',
+  S: 'ص',    D: 'ض',    T: 'ط',  Z: 'ظ',  E: 'ع',
+  g: 'غ',    _: 'ـ',    f: 'ف',  q: 'ق',  k: 'ك',
+  l: 'ل',    m: 'م',    n: 'ن',  h: 'ه',  w: 'و',
+  Y: 'ى',    y: 'ي',    F: 'ً',  N: 'ٌ',  K: 'ٍ',
+  a: 'َ',    u: 'ُ',    i: 'ِ',  "~": 'ّ',  o: 'ْ',
+  "`": 'ٰ'
+};
+
+function buckwalterToArabic(str = '') {
+  return str.split('').map(ch => buck2arab[ch] || ch).join('');
 }
 
-/**
- * fetchFile(path)
- *  – always from /data/,
- *  – returns Blob for .zip, text for .txt
- *  – strips BOM from text.
- */
-async function fetchFile(path) {
-  const url = path.startsWith("/") ? path : `/${path}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Failed to fetch ${url}: ${resp.status}`);
-  return url.endsWith(".zip")
-    ? resp.blob()
-    : resp.text().then(t => t.replace(/^\uFEFF/, ""));
-}
-
-/**
- * loadQAC()
- *  – parses qac.txt into an array of entries,
- *  – also builds tokenIndex & rootIndex maps.
- */
-export async function loadQAC() {
-  const txt = await fetchFile("/data/qac.txt");
-  const lines = txt.split(/\r?\n/);
+function parseQAC(text) {
   const entries = [];
-  const tokenIndex = {};
-  const rootIndex = {};
 
-  for (const ln of lines) {
-    if (!ln || ln.startsWith("#") || ln.startsWith("LOCATION\t")) continue;
-    const [location, bw, , feats] = ln.split("\t");
-    if (!bw || !feats) continue;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
 
-    // Buckwalter → Arabic
-    const token = [...bw].map(ch => ({
-      "'":"ء","|":"آ",">":"أ","&":"ؤ","<":"إ","}":"ئ",
-      A:"ا",b:"ب",p:"ة",t:"ت",v:"ث",j:"ج",
-      H:"ح",x:"خ",d:"د",'"':"ذ",r:"ر",z:"ز",
-      s:"س",$:"ش",S:"ص",D:"ض",T:"ط",Z:"ظ",
-      E:"ع",g:"غ",f:"ف",q:"ق",k:"ك",l:"ل",
-      m:"م",n:"ن",h:"ه",w:"و",Y:"ى",y:"ي",
-      F:"ً",N:"ٌ",K:"ٍ",a:"َ",u:"ُ",i:"ِ",
-      "~":"ْ",o:"ّ","`":"ٰ"
-    }[ch] || ch)).join("");
+    const parts = line.split('\t');
+    if (parts.length < 2) continue;
 
-    // extract features
-    let [prefix="", suffix="", root="", pattern="", lemma="", pos=""] = [];
-    feats.split("|").forEach((f,i,arr) => {
-      if (f==="PREFIX")   prefix = arr[i+1]||"";
-      if (f==="SUFFIX")   suffix = arr[i+1]||"";
-      if (f.startsWith("ROOT:")) root = f.slice(5);
-      if (/^(PAT|PATTERN):/.test(f)) pattern = f.split(":")[1]||"";
-      if (f.startsWith("LEM:"))   lemma = f.slice(4);
-      if (f.startsWith("POS:"))   pos = f.slice(4);
+    const [bwToken, featStr] = parts;
+    if (!bwToken || !featStr.includes('|')) continue;
+
+    const [
+      prefBW,
+      stemBW,
+      suffBW,
+      rootBW,
+      pattBW,
+      lemBW,
+      posBW
+    ] = featStr
+      .split('|')
+      .map(f => f.replace(/[{}]+/g, '').trim());
+
+    entries.push({
+      token:   buckwalterToArabic(bwToken),
+      prefix:  buckwalterToArabic(prefBW),
+      stem:    buckwalterToArabic(stemBW),
+      suffix:  buckwalterToArabic(suffBW),
+      root:    buckwalterToArabic(rootBW),
+      pattern: buckwalterToArabic(pattBW),
+      lemma:   buckwalterToArabic(lemBW),
+      pos:     posBW
     });
-
-    // derive stem
-    let stem = token;
-    if (prefix && stem.startsWith(prefix)) stem = stem.slice(prefix.length);
-    if (suffix && stem.endsWith(suffix))   stem = stem.slice(0, -suffix.length);
-
-    const normToken = normalizeArabic(token);
-    const normRoot  = normalizeArabic(root);
-    if (!normToken) continue;
-
-    const entry = { location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot };
-    entries.push(entry);
-    (tokenIndex[normToken] ||= []).push(entry);
-    if (normRoot) (rootIndex[normRoot] ||= []).push(location);
   }
 
-  // sort verse locations
-  Object.values(rootIndex).forEach(arr => arr.sort());
+  return entries;
+}
 
-  return { entries, tokenIndex, rootIndex };
+async function parseNEMLAR(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: ''
+  });
+  const sentences = [];
+
+  for (const fileName of Object.keys(zip.files)) {
+    if (!fileName.endsWith('.xml')) continue;
+
+    const xmlText = await zip.files[fileName].async('text');
+    const json = parser.parse(xmlText);
+    const file = json.NEMLAR?.FILE;
+    if (!file) continue;
+
+    const sents = Array.isArray(file.sentence)
+      ? file.sentence
+      : [file.sentence];
+
+    for (const s of sents) {
+      const ann = s.annotation?.ArabicLexical;
+      if (!ann) continue;
+
+      const lexes = Array.isArray(ann) ? ann : [ann];
+      sentences.push({
+        sentenceId: s.id,
+        text:       s.text?.trim() || '',
+        tokens:     lexes.map(l => ({
+          token:   l.word    || '',
+          lemma:   l.lemma   || '',
+          pos:     l.pos     || '',
+          prefix:  l.prefix  || '',
+          root:    l.root    || '',
+          pattern: l.pattern || '',
+          suffix:  l.suffix  || ''
+        }))
+      });
+    }
+  }
+
+  return sentences;
+}
+
+export async function loadQacEntries() {
+  const res = await fetch('/qac.txt');
+  if (!res.ok) throw new Error('Failed to fetch qac.txt');
+  const text = await res.text();
+  return parseQAC(text);
+}
+
+export async function loadNemlarSentences() {
+  const res = await fetch('/nemlar.zip');
+  if (!res.ok) throw new Error('Failed to fetch nemlar.zip');
+  const buf = await res.arrayBuffer();
+  return parseNEMLAR(buf);
+}
+
+// ----------------- ANALYZER FUNCTIONS -----------------
+
+// Arabic diacritics range U+064B .. U+0652
+const DIACRITICS = /[\u064B-\u0652]/g;
+
+// Strip diacritics and whitespace
+function normalize(str = '') {
+  return str.replace(DIACRITICS, '').trim();
 }
 
 /**
- * loadNemlar()
- *  – fetches nemlar.zip, unzips all XMLs,
- *  – parses each XML with fast-xml-parser,
- *  – returns { entries, tokenIndex, rootIndex }.
+ * Build a lookup map: normalizedToken → array of QAC entries
  */
-export async function loadNemlar() {
-  const blob = await fetchFile("/data/nemlar.zip");
-  const zip  = await JSZip.loadAsync(blob);
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: "",
-    trimValues: true,
-    textNodeName: "_text"
-  });
+export function buildQacMap(qacEntries) {
+  const map = new Map();
+  for (const e of qacEntries) {
+    const key = normalize(e.token);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(e);
+  }
+  return map;
+}
 
-  const entries = [];
-  const tokenIndex = {};
-  const rootIndex  = {};
+/**
+ * Segment input into the longest matching QAC tokens.
+ * Returns an array of { segment, entries }.
+ */
+export function analyzeWord(input, qacEntries) {
+  const qacMap = buildQacMap(qacEntries);
+  const normInput = normalize(input);
+  const results = [];
+  let pos = 0;
 
-  const xmlFiles = Object.values(zip.files).filter(f => !f.dir && f.name.endsWith(".xml"));
-  await Promise.all(xmlFiles.map(async f => {
-    const xmlText = await f.async("string");
-    const json    = parser.parse(xmlText);
-    const sents   = json.NEMLAR?.FILE?.sentence ?? [];
-    const arr     = Array.isArray(sents) ? sents : [sents];
+  while (pos < normInput.length) {
+    let matchLen = 0;
+    let matchKey = null;
 
-    arr.forEach(sent => {
-      const sid = sent.id || "";
-      const ann = Array.isArray(sent.annotation?.ArabicLexical)
-        ? sent.annotation.ArabicLexical
-        : [sent.annotation?.ArabicLexical].filter(Boolean);
+    for (let len = normInput.length - pos; len > 0; len--) {
+      const sub = normInput.substr(pos, len);
+      if (qacMap.has(sub)) {
+        matchLen = len;
+        matchKey = sub;
+        break;
+      }
+    }
 
-      ann.forEach(a => {
-        const tok = a.word || "";
-        const normToken = normalizeArabic(tok);
-        if (!normToken) return;
+    if (!matchKey) {
+      results.push({ segment: normInput[pos], entries: [] });
+      pos += 1;
+    } else {
+      results.push({ segment: matchKey, entries: qacMap.get(matchKey) });
+      pos += matchLen;
+    }
+  }
 
-        const entry = {
-          sentenceId: sid,
-          filename:   f.name,
-          token:      tok,
-          prefix:     a.prefix || "",
-          stem:       a.stem   || "",
-          suffix:     a.suffix  || "",
-          root:       a.root   || "",
-          pattern:    a.pattern|| "",
-          lemma:      a.lemma  || "",
-          pos:        a.pos    || "",
-          normToken
-        };
-        entries.push(entry);
-        (tokenIndex[normToken] ||= []).push(entry);
-
-        const r = normalizeArabic(a.root || tok);
-        if (r) (rootIndex[r] ||= []).push(entry);
-      });
-    });
-  }));
-
-  return { entries, tokenIndex, rootIndex };
+  return results;
 }

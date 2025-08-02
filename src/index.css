@@ -1,58 +1,21 @@
-/* 1. Reset box-sizing for predictable sizing */
-*, *::before, *::after {
-  box-sizing: border-box;
+.container {
+  padding: 1rem;
+  font-family: sans-serif;
 }
 
-/* 2. Define CSS variables for easy theming */
-:root {
-  --gap: 1rem;
-  --column-bg: #ffffff;
-  --column-border: #dddddd;
-  --column-radius: 4px;
-  --transition-duration: 0.2s;
+.search-bar {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
 }
 
-/* 3. Flex container for side-by-side corpora */
-.corpus-comparison {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap);
-  margin: var(--gap) 0;
+.morph-block {
+  border: 1px solid #ddd;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
-/* 4. Each corpus column */
-.corpus-column {
-  flex: 1 1 calc(50% - var(--gap));
-  min-width: 300px;
-  padding: var(--gap);
-  background-color: var(--column-bg);
-  border: 1px solid var(--column-border);
-  border-radius: var(--column-radius);
-  transition: box-shadow var(--transition-duration);
-}
-
-/* 5. Subtle hover emphasis */
-.corpus-column:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* 6. Individual table rows */
-.table-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--column-border);
-}
-
-/* 7. Remove border on last row */
-.table-row:last-child {
-  border-bottom: none;
-}
-
-/* 8. Stack columns on narrow viewports */
-@media (max-width: 600px) {
-  .corpus-column {
-    flex: 1 1 100%;
-  }
+.sentence-block {
+  margin-bottom: 1rem;
 }
