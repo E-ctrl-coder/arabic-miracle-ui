@@ -1,21 +1,58 @@
+/* 1. Reset box-sizing for predictable sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 2. Define CSS variables for easy theming */
+:root {
+  --gap: 1rem;
+  --column-bg: #ffffff;
+  --column-border: #dddddd;
+  --column-radius: 4px;
+  --transition-duration: 0.2s;
+}
+
+/* 3. Flex container for side-by-side corpora */
 .corpus-comparison {
   display: flex;
-  gap: 1rem;
   flex-wrap: wrap;
+  gap: var(--gap);
+  margin: var(--gap) 0;
 }
 
+/* 4. Each corpus column */
 .corpus-column {
-  flex: 1 1 48%;
+  flex: 1 1 calc(50% - var(--gap));
   min-width: 300px;
-  padding: 0.5rem;
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: var(--gap);
+  background-color: var(--column-bg);
+  border: 1px solid var(--column-border);
+  border-radius: var(--column-radius);
+  transition: box-shadow var(--transition-duration);
 }
 
+/* 5. Subtle hover emphasis */
+.corpus-column:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 6. Individual table rows */
 .table-row {
   display: flex;
-  gap: 0.5rem;
   align-items: center;
-  padding: 0.2rem 0;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--column-border);
+}
+
+/* 7. Remove border on last row */
+.table-row:last-child {
+  border-bottom: none;
+}
+
+/* 8. Stack columns on narrow viewports */
+@media (max-width: 600px) {
+  .corpus-column {
+    flex: 1 1 100%;
+  }
 }
