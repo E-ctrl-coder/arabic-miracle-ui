@@ -9,8 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "fast-xml-parser": "^4.2.5",
-    "jszip": "^3.10.1",
+    "fast-xml-parser": "^4.2.5",    // ReDoS-vulnerable versions (<4.2.4) fixed
+    "jszip": "^3.10.1",             // Required if still using JSZip in dataLoader.js
+    // "fflate": "^0.8.2",          // Uncomment to migrate from JSZip → fflate (optional)
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-window": "^1.8.11"
