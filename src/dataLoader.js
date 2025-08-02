@@ -31,7 +31,7 @@ const BW2AR = {
   "~": "ْ", o: "ّ", "`": "ٰ"
 };
 
-function buckwalterToArabic(bw = "") {
+export function buckwalterToArabic(bw = "") {
   return [...bw].map((ch) => BW2AR[ch] ?? ch).join("");
 }
 
