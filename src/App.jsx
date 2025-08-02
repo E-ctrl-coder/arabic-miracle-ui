@@ -1,129 +1,149 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { FixedSizeList } from "react-window";
-import { loadQAC, loadNemlar, normalizeArabic } from "./dataLoader";
+import {
+  loadQAC,
+  loadNemlar,
+  normalizeArabic,
+  buckwalterToArabic
+} from "./dataLoader";
+import { buildRootMap, fallbackByRoot } from "./utils/fallbackMatcher";
 import WordDisplay from "./components/WordDisplay";
 import "./index.css";
 
 export default function App() {
   const [translations, setTranslations] = useState({});
   const [qacEntries, setQacEntries] = useState([]);
-  const [qacRootIndex, setQacRootIndex] = useState({});
+  const [nemEntries, setNemEntries] = useState([]);
   const [nemTokenIndex, setNemTokenIndex] = useState({});
-  const [nemRootIndex, setNemRootIndex] = useState({});
   const [qacMatches, setQacMatches] = useState([]);
-  const [nemlarMatches, setNemlarMatches] = useState([]);
+  const [nemMatches, setNemMatches] = useState([]);
   const [verses, setVerses] = useState([]);
 
-  // Load corpora and translations only once on mount
+  // One-time loading of corpora
   useEffect(() => {
-    fetch((process.env.PUBLIC_URL || "") + "/translations.json")
-      .then((r) => r.json())
+    fetch(`${process.env.PUBLIC_URL || ""}/translations.json`)
+      .then(r => r.json())
       .then(setTranslations)
       .catch(console.error);
 
-    loadQAC().then(({ entries, rootIndex }) => {
-      setQacEntries(entries);
-      setQacRootIndex(rootIndex);
-    });
+    loadQAC()
+      .then(({ entries }) => setQacEntries(entries))
+      .catch(console.error);
 
-    loadNemlar().then(({ tokenIndex, rootIndex }) => {
-      setNemTokenIndex(tokenIndex);
-      setNemRootIndex(rootIndex);
-    });
+    loadNemlar()
+      .then(({ entries, tokenIndex }) => {
+        setNemEntries(entries);
+        setNemTokenIndex(tokenIndex);
+      })
+      .catch(console.error);
   }, []);
 
-  function handleSearch(e) {
+  const handleSearch = async e => {
     e.preventDefault();
     console.clear();
-
-    const q = e.target.query.value.trim();
-    const norm = normalizeArabic(q);
+    const raw = e.target.query.value.trim();
+    const norm = normalizeArabic(raw);
     if (!norm) {
       setQacMatches([]);
-      setNemlarMatches([]);
+      setNemMatches([]);
       setVerses([]);
       return;
     }
 
-    const qlist = qacEntries.filter((e) => e.normToken === norm);
+    // --- QAC Matches ---
+    // 1. Exact surface match
+    let qlist = qacEntries.filter(e => e.normToken === norm);
+
+    // 2. Fallback by stripping "ال" or particles if no QAC matches
+    if (!qlist.length) {
+      const stripped = normalizeArabic(raw.replace(/^ال/, ""));
+      qlist = qacEntries.filter(e => e.normRoot === stripped);
+    }
+
     setQacMatches(qlist);
 
-    const root = qlist[0]?.normRoot;
-    setVerses(root ? qacRootIndex[root] || [] : []);
+    // Build verses list by root normalization
+    const rootNorm = qlist[0]?.normRoot;
+    setVerses(rootNorm
+      ? (qlist.length ? [...new Set(qlist.map(e => e.location))] : [])
+      : []);
 
+    // --- NEMLAR Matches ---
+    const rootMap = buildRootMap(nemEntries);
     const exact = nemTokenIndex[norm] || [];
-    const fallback = nemRootIndex[norm] || [];
-    setNemlarMatches(exact.length > 0 ? exact : fallback);
-  }
+    const fallback = fallbackByRoot(raw, rootMap);
+    setNemMatches(exact.length ? exact : fallback);
+  };
 
-  const QACList = useMemo(
-    () => (
-      <FixedSizeList
-        height={500}
-        itemCount={qacMatches.length}
-        itemSize={40}
-        width="100%"
-        overscanCount={5}
-      >
-        {({ index, style }) => {
-          const e = qacMatches[index];
-          return (
-            <div style={style} className="table-row">
-              <span>{e.token}</span>
-              <WordDisplay tokenData={e} translations={translations} />
-              <span>{e.pattern}</span>
-              <span>{e.lemma}</span>
-              <span>{e.pos}</span>
-            </div>
-          );
-        }}
-      </FixedSizeList>
-    ),
-    [qacMatches, translations]
-  );
+  const QACList = useMemo(() => (
+    <FixedSizeList
+      height={400}
+      width="100%"
+      itemCount={qacMatches.length}
+      itemSize={35}
+      style={{ overflowX: "hidden" }}
+    >
+      {({ index, style }) => {
+        const e = qacMatches[index];
+        return (
+          <div style={style} className="table-row">
+            <span>{e.token}</span>
+            <WordDisplay tokenData={e} translations={translations} />
+            <span>{e.pattern}</span>
+            <span>{e.lemma}</span>
+            <span>{e.pos}</span>
+          </div>
+        );
+      }}
+    </FixedSizeList>
+  ), [qacMatches, translations]);
 
-  const NemList = useMemo(
-    () => (
-      <FixedSizeList
-        height={500}
-        itemCount={nemlarMatches.length}
-        itemSize={40}
-        width="100%"
-        overscanCount={5}
-      >
-        {({ index, style }) => {
-          const e = nemlarMatches[index];
-          return (
-            <div style={style} className="table-row">
-              <span>{e.filename}</span>
-              <span>{e.sentenceId}</span>
-              <WordDisplay tokenData={e} translations={translations} />
-              <span>{e.pos}</span>
-            </div>
-          );
-        }}
-      </FixedSizeList>
-    ),
-    [nemlarMatches, translations]
-  );
+  const NemList = useMemo(() => (
+    <FixedSizeList
+      height={400}
+      width="100%"
+      itemCount={nemMatches.length}
+      itemSize={35}
+      style={{ overflowX: "hidden" }}
+    >
+      {({ index, style }) => {
+        const e = nemMatches[index];
+        return (
+          <div style={style} className="table-row">
+            <span>{e.filename}</span>
+            <span>{e.sentenceId}</span>
+            {/** Provide full surface if `stem` is empty **/}
+            <WordDisplay tokenData={{
+              prefix: e.prefix,
+              stem: e.stem || e.token.replace(e.prefix || "", ""),
+              suffix: e.suffix
+            }} translations={translations}/>
+            <span>{e.pos}</span>
+          </div>
+        );
+      }}
+    </FixedSizeList>
+  ), [nemMatches, translations]);
 
   return (
-    <div className="p-4">
+    <div className="p-6">
       <form onSubmit={handleSearch} className="input-container">
-        <input name="query" placeholder="أدخل كلمة عربية" />
+        <input name="query" placeholder="أدخل كلمة عربية"/>
         <button type="submit">تحليل / Analyze</button>
       </form>
 
       <div className="corpus-comparison">
         <div className="corpus-column">
           <h2>QAC Analysis</h2>
-          {qacMatches.length === 0 ? <p>No QAC matches</p> : QACList}
+          {qacMatches.length ? QACList : <p>No QAC matches</p>}
           <h3>Verses for Root</h3>
-          <ul>{verses.map((v, i) => <li key={i}>{v}</li>)}</ul>
+          {verses.length ? (
+            <ul>{verses.map((v,i)=><li key={i}>{v}</li>)}</ul>
+          ) : <p>No verses found</p>}
         </div>
         <div className="corpus-column">
           <h2>NEMLAR Analysis</h2>
-          {nemlarMatches.length === 0 ? <p>No NEMLAR matches</p> : NemList}
+          {nemMatches.length ? NemList : <p>No NEMLAR matches</p>}
         </div>
       </div>
     </div>
