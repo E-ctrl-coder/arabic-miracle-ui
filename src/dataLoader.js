@@ -36,7 +36,7 @@ export function buckwalterToArabic(bw = "") {
 }
 
 async function fetchFile(path) {
-  const base = process.env.PUBLIC_URL || "";
+  const base = import.meta.env.BASE_URL || "";
   const resp = await fetch(base + path);
   if (!resp.ok) throw new Error(`Failed to fetch ${path}: ${resp.status}`);
   return path.endsWith(".zip")
@@ -67,12 +67,12 @@ export async function loadQAC() {
 
     for (let i = 0; i < featParts.length; i++) {
       const f = featParts[i];
-      if (f === "PREFIX")   prefix = buckwalterToArabic(featParts[i + 1] || "");
-      if (f === "SUFFIX")   suffix = buckwalterToArabic(featParts[i + 1] || "");
-      if (f.startsWith("ROOT:"))   root = buckwalterToArabic(f.slice(5));
+      if (f === "PREFIX") prefix = buckwalterToArabic(featParts[i + 1] || "");
+      if (f === "SUFFIX") suffix = buckwalterToArabic(featParts[i + 1] || "");
+      if (f.startsWith("ROOT:")) root = buckwalterToArabic(f.slice(5));
       if (/^(PAT|PATTERN):/.test(f)) pattern = f.split(":")[1] || "";
-      if (f.startsWith("LEM:"))     lemma = buckwalterToArabic(f.slice(4));
-      if (f.startsWith("POS:"))     pos   = f.slice(4);
+      if (f.startsWith("LEM:")) lemma = buckwalterToArabic(f.slice(4));
+      if (f.startsWith("POS:")) pos = f.slice(4);
     }
 
     let stem = token;
@@ -80,7 +80,7 @@ export async function loadQAC() {
     if (suffix && stem.endsWith(suffix)) stem = stem.slice(0, stem.length - suffix.length);
 
     const normToken = normalizeArabic(token);
-    const normRoot  = normalizeArabic(root);
+    const normRoot = normalizeArabic(root);
     if (!normToken) continue;
 
     entries.push({ location, token, prefix, stem, suffix, root, pattern, lemma, pos, normToken, normRoot });
@@ -98,8 +98,8 @@ export async function loadQAC() {
 }
 
 export async function loadNemlar() {
-  const blob   = await fetchFile("/nemlar.zip");
-  const zip    = await JSZip.loadAsync(blob);
+  const blob = await fetchFile("/nemlar.zip");
+  const zip = await JSZip.loadAsync(blob);
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "",
@@ -108,8 +108,7 @@ export async function loadNemlar() {
   });
 
   const entries = [];
-  const xmlfiles = Object.values(zip.files)
-    .filter(f => !f.dir && f.name.endsWith(".xml"));
+  const xmlfiles = Object.values(zip.files).filter(f => !f.dir && f.name.endsWith(".xml"));
 
   await Promise.all(
     xmlfiles.map(async f => {
@@ -119,12 +118,12 @@ export async function loadNemlar() {
       const sentArray = Array.isArray(sentences) ? sentences : [sentences];
 
       sentArray.forEach(sent => {
-        const sid     = sent.id || "";
-        const ann    = sent.annotation?.ArabicLexical ?? [];
+        const sid = sent.id || "";
+        const ann = sent.annotation?.ArabicLexical ?? [];
         const annList = Array.isArray(ann) ? ann : [ann];
 
         annList.forEach(a => {
-          const tok       = a.word || "";
+          const tok = a.word || "";
           const normToken = normalizeArabic(tok);
           if (!normToken) return;
 
@@ -147,12 +146,12 @@ export async function loadNemlar() {
   );
 
   const tokenIndex = {};
-  const rootIndex  = {};
+  const rootIndex = {};
 
   entries.forEach(e => {
     (tokenIndex[e.normToken] ||= []).push(e);
     const raw = e.root?.trim() ? e.root : e.token;
-    const r   = normalizeArabic(raw);
+    const r = normalizeArabic(raw);
     if (r) (rootIndex[r] ||= []).push(e);
   });
 
@@ -161,6 +160,6 @@ export async function loadNemlar() {
 
 // Expose loaders for console debugging
 if (typeof window !== "undefined") {
-  window.loadQAC    = loadQAC;
+  window.loadQAC = loadQAC;
   window.loadNemlar = loadNemlar;
 }
