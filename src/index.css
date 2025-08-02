@@ -1,32 +1,21 @@
-/* === Side‑by‑side comparison layout === */
 .corpus-comparison {
   display: flex;
-  flex-wrap: wrap;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .corpus-column {
   flex: 1 1 48%;
-  padding: 1rem;
-  background: #fafafa;
-  border: 1px solid #ddd;
-  border-radius: 6px;
   min-width: 300px;
+  padding: 0.5rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 }
 
-.corpus-column table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 0.5rem;
-}
-
-.corpus-column th,
-.corpus-column td {
-  border: 1px solid #ccc;
-  padding: 0.25rem;
-  text-align: center;
-}
-
-.corpus-column th {
-  background: #f0f0f0;
+.table-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.2rem 0;
 }
