@@ -1,10 +1,70 @@
 // src/App.jsx
 
 import React, { useState, useEffect } from 'react';
-import { getMatches } from './utils/dataLoader';
-import './index.css';
+import { getMatches } from './utils/dataLoader'
 
-function App() {
+/**
+ * Renders a colored segment (prefix / stem / suffix).
+ * Won't render anything if text is empty.
+ */
+function Segment({ text, type }) {
+  if (!text) return null;
+  return (
+    <span className={`segment segment--${type}`}>
+      {text}
+    </span>
+  );
+}
+
+/**
+ * One-panel of analysis, either QAC or Nemlar.
+ * isQac toggles the extra stats & fields.
+ */
+function AnalysisPanel({ title, classSuffix, data, isQac = false }) {
+  return (
+    <div className={`panel panel--${classSuffix}`}>
+      <h3>{title}</h3>
+
+      {isQac && (
+        <>
+          <p>
+            Word occurrences: {data.tokenCount} in {data.tokenRefs.join(', ')}
+          </p>
+          <p>
+            Root occurrences: {data.rootCount} in {data.rootRefs.join(', ')}
+          </p>
+        </>
+      )}
+
+      {isQac && data.qac.length === 0 && <p>No QAC matches.</p>}
+      {!isQac && data.nemlar.length === 0 && <p>No Nemlar matches.</p>}
+
+      {(isQac ? data.qac : data.nemlar).map((e, i) => (
+        <div key={i} className="morph-record">
+          <div className="segments">
+            <Segment text={e.prefix} type="prefix" />
+            <Segment text={isQac ? e.stem : e.token} type="stem" />
+            <Segment text={e.suffix} type="suffix" />
+          </div>
+          <ul className="details">
+            {isQac && <li>Token: {e.token}</li>}
+            {isQac && <li>Root: {e.root}</li>}
+            <li>Pattern: {(e.pattern || '—')}</li>
+            <li>Lemma: {e.lemma}</li>
+            <li>POS: {e.pos}</li>
+            {isQac && <li>Meaning: {(e.meaning || '—')}</li>}
+            {isQac
+              ? <li>Location: Sura {e.sura}, Ayah {e.ayah}</li>
+              : <li>Location: Sentence {e.sentenceId}</li>
+            }
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function App() {
   const [inputValue, setInputValue] = useState('');
   const [results, setResults]       = useState(null);
   const [error, setError]           = useState(null);
@@ -18,7 +78,7 @@ function App() {
     }
 
     let active = true;
-    async function fetchMatches() {
+    (async () => {
       try {
         setError(null);
         const res = await getMatches(word);
@@ -29,9 +89,8 @@ function App() {
         setError(e.message);
         setResults(null);
       }
-    }
+    })();
 
-    fetchMatches();
     return () => { active = false; };
   }, [inputValue]);
 
@@ -57,77 +116,18 @@ function App() {
         {results && (
           <>
             <p className="match-step">Match Step: {results.step}</p>
-
             <div className="panels">
-              {/* QAC Panel */}
-              <div className="panel panel--qac">
-                <h3>QAC Analysis</h3>
-
-                {/* Global stats */}
-                <p>
-                  Word occurrences: {results.tokenCount} in{' '}
-                  {results.tokenRefs.join(', ')}
-                </p>
-                <p>
-                  Root occurrences: {results.rootCount} in{' '}
-                  {results.rootRefs.join(', ')}
-                </p>
-
-                {results.qac.length === 0 && <p>No QAC matches.</p>}
-                {results.qac.map((e, i) => (
-                  <div key={i} className="morph-record">
-                    <div className="segments">
-                      <span className="segment segment--prefix">
-                        {e.prefix}
-                      </span>
-                      <span className="segment segment--stem">
-                        {e.stem}
-                      </span>
-                      <span className="segment segment--suffix">
-                        {e.suffix}
-                      </span>
-                    </div>
-                    <ul className="details">
-                      <li>Token: {e.token}</li>
-                      <li>Root: {e.root}</li>
-                      <li>Pattern: {e.pattern || '—'}</li>
-                      <li>Lemma: {e.lemma}</li>
-                      <li>POS: {e.pos}</li>
-                      <li>Meaning: {e.meaning || '—'}</li>
-                      <li>
-                        Location: Sura {e.sura}, Ayah {e.ayah}
-                      </li>
-                    </ul>
-                  </div>
-                ))}
-              </div>
-
-              {/* Nemlar Panel */}
-              <div className="panel panel--nemlar">
-                <h3>Nemlar Analysis</h3>
-                {results.nemlar.length === 0 && <p>No Nemlar matches.</p>}
-                {results.nemlar.map((e, i) => (
-                  <div key={i} className="morph-record">
-                    <div className="segments">
-                      <span className="segment segment--prefix">
-                        {e.prefix}
-                      </span>
-                      <span className="segment segment--stem">
-                        {e.token}
-                      </span>
-                      <span className="segment segment--suffix">
-                        {e.suffix}
-                      </span>
-                    </div>
-                    <ul className="details">
-                      <li>Pattern: {e.pattern}</li>
-                      <li>Lemma: {e.lemma}</li>
-                      <li>POS: {e.pos}</li>
-                      <li>Location: Sentence {e.sentenceId}</li>
-                    </ul>
-                  </div>
-                ))}
-              </div>
+              <AnalysisPanel
+                title="QAC Analysis"
+                classSuffix="qac"
+                data={results}
+                isQac
+              />
+              <AnalysisPanel
+                title="Nemlar Analysis"
+                classSuffix="nemlar"
+                data={results}
+              />
             </div>
           </>
         )}
@@ -135,5 +135,3 @@ function App() {
     </div>
   );
 }
-
-export default App;
