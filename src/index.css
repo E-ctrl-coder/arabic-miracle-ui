@@ -1,8 +1,10 @@
+/* Container & Base Text */
 .container {
   padding: 1rem;
   font-family: sans-serif;
 }
 
+/* Search Bar */
 .search-bar {
   width: 100%;
   padding: 0.5rem;
@@ -10,12 +12,81 @@
   font-size: 1rem;
 }
 
-.morph-block {
-  border: 1px solid #ddd;
-  padding: 0.5rem;
-  margin-bottom: 0.75rem;
+/* Panels: Side-by-Side Layout */
+.panels {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1rem;
 }
 
-.sentence-block {
+/* Individual Panels */
+.panel {
+  flex: 1;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+/* Panel Variants */
+.panel--qac {
+  border-color: #1e90ff;
+}
+
+.panel--nemlar {
+  border-color: #228b22;
+}
+
+/* Global Stats in Panels */
+.panel > p {
+  margin: 0.5rem 0;
+  word-wrap: break-word;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+/* Match Step Indicator */
+.match-step {
+  font-style: italic;
   margin-bottom: 1rem;
+}
+
+/* Morph Record Wrapper */
+.morph-record {
+  margin-bottom: 1.5rem;
+}
+
+/* Segments: Colour-Coded Parts */
+.segments {
+  font-size: 1.2em;
+  margin-bottom: 0.5rem;
+}
+
+.segment--prefix {
+  color: #1e90ff;
+}
+
+.segment--stem {
+  color: #228b22;
+}
+
+.segment--suffix {
+  color: #ff8c00;
+}
+
+/* Details List */
+.details {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.details li {
+  margin: 0.2rem 0;
+}
+
+/* Error Messages */
+.error {
+  color: red;
+  margin-top: 0.5rem;
 }
