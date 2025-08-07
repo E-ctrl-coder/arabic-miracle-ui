@@ -1,74 +1,55 @@
 'use strict';
-/**
- * scripts/build-qac.cjs
- * Build public/qac.json from public/qac.txt at word-level.
- */
 
 const fs   = require('fs');
 const path = require('path');
 
-// Buckwalter → Arabic map
-const BW2AR = {
-  "|":"أ","<":"إ","}":"ء","{":"ٱ",
-  "A":"ا","b":"ب","t":"ت","T":"ث","j":"ج","H":"ح","x":"خ",
-  "d":"د","*":"ذ","r":"ر","z":"ز","s":"س","$":"ش",
-  "S":"ص","D":"ض","Z":"ظ","c":"ع","g":"غ","f":"ف","q":"ق",
-  "k":"ك","l":"ل","m":"م","n":"ن","h":"ه","w":"و","y":"ي","Y":"ى",
-  "a":"َ","u":"ُ","i":"ِ","o":"ْ","~":"ّ"
-};
-
-function transliterate(bw) {
-  return bw.split('').map(ch => BW2AR[ch] || ch).join('');
+function fail(msg) {
+  console.error(`ERROR: ${msg}`);
+  process.exit(1);
 }
 
-const inputPath  = path.join(__dirname, '../public/qac.txt');
-const outputPath = path.join(__dirname, '../public/qac.json');
+(async function build() {
+  const inPath  = path.resolve(__dirname, '../public/qac.txt');
+  const outPath = path.resolve(__dirname, '../public/qac.json');
 
-// Read and filter lines (skip comments & blank lines)
-const lines = fs.readFileSync(inputPath, 'utf8')
-  .split(/\r?\n/)
-  .filter(l => l.trim() && !l.startsWith('#'));
+  // 1. Read and drop blanks/comments
+  const lines = fs.readFileSync(inPath, 'utf8')
+    .split(/\r?\n/)
+    .filter(line => line.trim() && !line.startsWith('#'));
 
-let seenHeader = false;
-const rawEntries = [];
+  // 2. Locate header and compute column indexes
+  const header = lines.find(line => line === 'LOCATION\tFORM\tTAG\tFEATURES');
+  if (!header) fail('header "LOCATION<TAB>FORM<TAB>TAG<TAB>FEATURES" not found');
+  const cols = header.split('\t');
+  const idxLoc      = cols.indexOf('LOCATION');
+  const idxForm     = cols.indexOf('FORM');
+  const idxTag      = cols.indexOf('TAG');
+  const idxFeatures = cols.indexOf('FEATURES');
 
-for (const raw of lines) {
-  const line = raw.trim();
-  if (!seenHeader) {
-    if (line === 'LOCATION\tFORM\tTAG\tFEATURES') {
-      seenHeader = true;
-    }
-    continue;
+  if ([idxLoc, idxForm, idxTag, idxFeatures].some(i => i < 0)) {
+    fail('one of LOCATION, FORM, TAG or FEATURES is missing from header');
   }
-  if (!line.startsWith('(')) continue;
 
-  const cols = line.split('\t');
-  if (cols.length < 4) continue;
+  // 3. Take only data rows beginning with "("
+  const dataRows = lines
+    .slice(lines.indexOf(header) + 1)
+    .filter(line => line.charAt(0) === '(');
 
-  const [location, formBW] = cols;
-  rawEntries.push({
-    location,
-    form: transliterate(formBW),
-    seg: Number(location.split(':')[3])
+  // 4. Map to JSON objects
+  const entries = dataRows.map(line => {
+    const parts = line.split('\t');
+    return {
+      location: parts[idxLoc],
+      form:     parts[idxForm],
+      tag:      parts[idxTag],
+      features: parts[idxFeatures]
+    };
   });
-}
 
-// Group morphemes into words by sura:ayah:word index
-const byWord = rawEntries.reduce((acc, { location, form, seg }) => {
-  const [s, a, w] = location.slice(1, -1).split(':').map(Number);
-  const key = `${s}:${a}:${w}`;
-  (acc[key] || (acc[key] = [])).push({ form, seg });
-  return acc;
-}, {});
-
-// Build final entries: { location: "sura:ayah", form: "fullWord" }
-const entries = Object.entries(byWord).map(([key, segs]) => {
-  segs.sort((a, b) => a.seg - b.seg);
-  const fullForm = segs.map(x => x.form).join('');
-  const [sura, ayah] = key.split(':');
-  return { location: `${sura}:${ayah}`, form: fullForm };
+  // 5. Write a pretty-printed JSON array
+  fs.writeFileSync(outPath, JSON.stringify(entries, null, 2) + '\n', 'utf8');
+  console.log(`✔ Built qac.json with ${entries.length} entries`);
+})().catch(err => {
+  console.error(err);
+  process.exit(1);
 });
-
-// Write the JSON
-fs.writeFileSync(outputPath, JSON.stringify(entries, null, 2) + '\n', 'utf8');
-console.log(`✔ Built qac.json with ${entries.length} word entries`);
