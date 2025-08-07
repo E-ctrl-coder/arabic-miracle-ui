@@ -2,26 +2,17 @@
   "name": "arabic-miracle-ui",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-  "build:qac": "node scripts/build-qac.cjs",
-    "build:data": "npm run build-qac",
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "serve": "vite preview"
+    "build-qac": "node scripts/build-qac.cjs",
+    "build": "npm run build-qac && react-scripts build",
+    "start": "react-scripts start",
+    "test": "react-scripts test --env=jsdom"
   },
   "dependencies": {
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.0.0",
-    "vite": "^4.5.14"
-  },
-  "overrides": {
-    "esbuild": "0.25.0"
-  },
-  "engines": {
-    "node": ">=16"
+    "react-scripts": "^5.0.1"
   }
 }
