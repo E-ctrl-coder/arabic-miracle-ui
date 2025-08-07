@@ -1,149 +1,118 @@
-// src/index.js
-
 import { loadQacMap } from './loader/qacJsonLoader.js';
 
-// 1. Safely strip Arabic diacritics (tashkīl)
-function stripDiacritics(s) {
-  return (s || '').replace(/[\u064B-\u0652\u0670]/g, '');
+const TASHKEEL = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g;
+
+function normalizeArabic(s = '') {
+  return s.normalize('NFC');
 }
 
-// 2. Normalize common letter variants (keep tashkīl)
+function stripDiacritics(s) {
+  return normalizeArabic(s).replace(TASHKEEL, '');
+}
+
 function normalizeLetters(s) {
-  return (s || '')
+  return normalizeArabic(s)
     .replace(/[إأآا]/g, 'ا')
     .replace(/ى/g, 'ي')
-    .replace(/ؤ/g, 'و')
-    .replace(/ئ/g, 'ي')
+    .replace(/[ؤئ]/g, 'ي')
     .replace(/ة/g, 'ه')
     .replace(/ـ/g, '');
 }
 
-// 3. Generate stems by stripping prefixes/suffixes
 function stripAffixes(s) {
   const prefixes = ['وال','فال','بال','كال','لل','ال','و','ف','ب','ك','ل','س'];
   const suffixes = ['ات','ان','ين','ون','ة','ه','ها','هم','نا','ي'];
   const stems = new Set([s]);
 
-  prefixes.forEach(pref => {
-    if (s.startsWith(pref)) stems.add(s.slice(pref.length));
-  });
-  suffixes.forEach(suf => {
-    if (s.endsWith(suf)) stems.add(s.slice(0, -suf.length));
-  });
-  prefixes.forEach(pref => {
-    if (s.startsWith(pref)) {
-      const mid = s.slice(pref.length);
-      suffixes.forEach(suf => {
-        if (mid.endsWith(suf)) stems.add(mid.slice(0, -suf.length));
-      });
-    }
+  prefixes.forEach(p => s.startsWith(p) && stems.add(s.slice(p.length)));
+  suffixes.forEach(x => s.endsWith(x)   && stems.add(s.slice(0, -x.length)));
+  prefixes.forEach(p => {
+    if (!s.startsWith(p)) return;
+    const mid = s.slice(p.length);
+    suffixes.forEach(x => mid.endsWith(x) && stems.add(mid.slice(0, -x.length)));
   });
 
-  return [...stems].filter(x => x);
-}
-
-// 4. Helper: scan qacMap for forms matching the predicate
-function findMatches(predicate) {
-  const out = [];
-  for (const [form, infos] of qacMap) {
-    if (predicate(form)) out.push(...infos);
-  }
-  return out;
-}
-
-// 5. Highlight root letters only if pattern exists
-function highlightRootLetters(form, pattern) {
-  if (!pattern) return form;
-
-  const positions = [];
-  for (let i = 0; i < pattern.length; i++) {
-    if (['f','3','l'].includes(pattern[i])) positions.push(i);
-  }
-
-  return [...form]
-    .map((ch, idx) =>
-      positions.includes(idx)
-        ? `<span class="root-letter">${ch}</span>`
-        : ch
-    )
-    .join('');
+  stems.delete('');
+  return [...stems];
 }
 
 let qacMap = new Map();
 
 async function main() {
-  try {
-    qacMap = await loadQacMap();
-  } catch (err) {
-    console.error('خطأ في تحميل بيانات QAC:', err);
-    document.getElementById('step-info').textContent = 'خطأ في التحميل.';
-    return;
-  }
+  qacMap = await loadQacMap();
   document.getElementById('go').addEventListener('click', handleAnalyze);
 }
 
+function findMatches(fn) {
+  const out = [];
+  for (const [surface, entries] of qacMap) {
+    if (fn(surface)) out.push(...entries);
+  }
+  return out;
+}
+
+function dedupe(entries) {
+  const seen = new Set();
+  return entries.filter(e => {
+    const key = `${e.verseKey}|${e.surface}`;
+    return seen.has(key) ? false : seen.add(key);
+  });
+}
+
 function handleAnalyze() {
-  const raw = document.getElementById('lookup').value.trim();
-  if (!raw) return;
+  const input = document.getElementById('lookup').value.trim();
+  const panel = document.getElementById('qac-panel');
+  const info  = document.getElementById('step-info');
+  panel.innerHTML = '';
+  info.textContent  = '';
 
-  document.getElementById('step-info').textContent = '';
-  document.getElementById('qac-panel').innerHTML = '';
+  if (!input) return;
 
-  let results = [];
-  let stepDesc = '';
+  const raw        = normalizeArabic(input);
+  let results      = [];
+  let stageMessage = '';
 
-  // Stage 1: exact match (with tashkīl)
-  results = qacMap.get(raw) || [];
-  if (results.length) {
-    stepDesc = 'مطابقة دقيقة (مع تشكيل)';
-  }
+  // Stage 1: exact (with tashkīl)
+  results = findMatches(s => normalizeArabic(s) === raw);
+  if (results.length) stageMessage = 'مرحلة 1: مطابقة دقيقة (مع تشكيل)';
 
-  // Stage 2: exact match without tashkīl
+  // Stage 2: without tashkīl
   if (!results.length) {
-    const key = stripDiacritics(raw);
-    results = findMatches(frm => stripDiacritics(frm) === key);
-    if (results.length) {
-      stepDesc = 'مطابقة بدون تشكيل';
-    }
+    const bare = stripDiacritics(raw);
+    results = findMatches(s => stripDiacritics(s) === bare);
+    if (results.length) stageMessage = 'مرحلة 2: بدون تشكيل';
   }
 
-  // Stage 3: normalize letters (keep tashكīl)
+  // Stage 3: normalize letters (with tashkīl)
   if (!results.length) {
     const norm = normalizeLetters(raw);
-    results = findMatches(frm => normalizeLetters(frm) === norm);
-    if (results.length) {
-      stepDesc = 'مطابقة بعد التطبيع (مع تشكيل)';
-    }
+    results = findMatches(s => normalizeLetters(s) === norm);
+    if (results.length) stageMessage = 'مرحلة 3: تطبيع (مع تشكيل)';
   }
 
-  // Stage 4: normalize + strip tashكīl
+  // Stage 4: normalize + strip tashkīل
   if (!results.length) {
-    const normStrip = stripDiacritics(normalizeLetters(raw));
-    results = findMatches(
-      frm => stripDiacritics(normalizeLetters(frm)) === normStrip
-    );
-    if (results.length) {
-      stepDesc = 'مطابقة بعد التطبيع وبدون تشكيل';
-    }
+    const normBare = stripDiacritics(normalizeLetters(raw));
+    results = findMatches(s => stripDiacritics(normalizeLetters(s)) === normBare);
+    if (results.length) stageMessage = 'مرحلة 4: تطبيع + بدون تشكيل';
   }
 
-  // Stage 5: strip prefixes/suffixes + normalize+strip tashكīl
+  // Stage 5: affix-stripping
   if (!results.length) {
-    const base = stripDiacritics(normalizeLetters(raw));
+    const base  = stripDiacritics(normalizeLetters(raw));
     const stems = stripAffixes(base);
-    for (const stem of stems) {
-      results = findMatches(
-        frm => stripDiacritics(normalizeLetters(frm)) === stem
-      );
+    for (const st of stems) {
+      results = findMatches(s => stripDiacritics(normalizeLetters(s)) === st);
       if (results.length) {
-        stepDesc = 'مطابقة بعد إزالة السوابق واللواحق';
+        stageMessage = 'مرحلة 5: إزالة السوابق واللواحق';
         break;
       }
     }
   }
 
+  results = dedupe(results);
+  info.textContent = stageMessage || 'لا توجد نتائج.';
   renderResults(results);
-  document.getElementById('step-info').textContent = stepDesc || 'لا نتائج.';
 }
 
 function renderResults(entries) {
@@ -152,27 +121,23 @@ function renderResults(entries) {
     panel.textContent = 'لا توجد نتائج.';
     return;
   }
-
   const ul = document.createElement('ul');
-  entries.forEach(({ form, pattern, root, verseKey }) => {
+  entries.forEach(e => {
     const li = document.createElement('li');
-    const display = pattern
-      ? highlightRootLetters(form, pattern)
-      : form;
-
-    li.innerHTML = [
-      `الآية ${verseKey}:`,
-      `<strong>${display}</strong>`,
-      `(الصيغة: ${form})`,
-      root ? `الجذر: ${root}` : '',
-      pattern ? `البنية: ${pattern}` : ''
-    ].filter(Boolean).join(' ');
+    li.innerHTML = `
+      <div>الآية: ${e.verseKey}</div>
+      <div>الكلمة: ${e.surface}</div>
+      <div>البادئة: ${e.prefix}</div>
+      <div>الجذر: ${e.root}</div>
+      <div>الجذع: ${e.stem}</div>
+      <div>اللاحقة: ${e.suffix}</div>
+    `;
     ul.appendChild(li);
   });
   panel.appendChild(ul);
 }
 
 main().catch(err => {
-  console.error('خطأ في التهيئة:', err);
+  console.error('Initialization error:', err);
   document.getElementById('step-info').textContent = `خطأ: ${err.message}`;
 });

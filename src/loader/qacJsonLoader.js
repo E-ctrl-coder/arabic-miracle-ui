@@ -1,9 +1,8 @@
 // src/loader/qacJsonLoader.js
 
 /**
- * Load the QAC map from /qac.json.
- * Each entry in your qac.json only has `form` and `location`.
- * We default any missing `root` or `pattern` to empty strings.
+ * Fetches and indexes your prebuilt public/qac.json.
+ * Skips any entries whose `form` isn’t a string or contains “disclaimer”.
  */
 export async function loadQacMap() {
   const resp = await fetch('/qac.json');
@@ -14,16 +13,12 @@ export async function loadQacMap() {
   const map = new Map();
 
   data.forEach(entry => {
-    const { form, location, root = '', pattern = '' } = entry || {};
-
+    const { form, location } = entry || {};
     if (typeof form !== 'string') return;
     if (/disclaimer/i.test(form)) return;
 
-    const info = { form, verseKey: location, root, pattern };
-
-    if (!map.has(form)) {
-      map.set(form, []);
-    }
+    const info = { form, verseKey: location };
+    if (!map.has(form)) map.set(form, []);
     map.get(form).push(info);
   });
 
