@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Arabic Morphology Analyzer</title>
+  <style>
+    .root-letter { color: crimson; font-weight: bold; }
+    #dictionary-panel { display: none; margin-top: 1rem; }
+    #dictionary-panel h3 { margin-bottom: 0.2rem; }
+  </style>
+  
+  <script type="module" crossorigin src="/assets/index-980b6f79.js"></script>
+</head>
+<body>
+  <h1>Arabic Morphology Analyzer</h1>
+  <input id="lookup" placeholder="Enter Arabic word" />
+  <button id="go">Analyze</button>
+  <button id="dict-toggle">Toggle Dictionary</button>
+  <div id="step-info"></div>
+
+  <h2>QAC Results</h2>
+  <div id="qac-panel"></div>
+
+  <h2>Mini-Dictionary View</h2>
+  <div id="dictionary-panel"></div>
+</body>
+</html>

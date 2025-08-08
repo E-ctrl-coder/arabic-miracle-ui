@@ -25,7 +25,7 @@ function stripAffixes(s) {
   const stems = new Set([s]);
 
   prefixes.forEach(p => s.startsWith(p) && stems.add(s.slice(p.length)));
-  suffixes.forEach(x => s.endsWith(x)   && stems.add(s.slice(0, -x.length)));
+  suffixes.forEach(x => s.endsWith(x) && stems.add(s.slice(0, -x.length)));
   prefixes.forEach(p => {
     if (!s.startsWith(p)) return;
     const mid = s.slice(p.length);
@@ -63,8 +63,10 @@ function handleAnalyze() {
   const input = document.getElementById('lookup').value.trim();
   const panel = document.getElementById('qac-panel');
   const info  = document.getElementById('step-info');
+  const debug = document.getElementById('debug-panel');
   panel.innerHTML = '';
   info.textContent  = '';
+  debug.innerHTML = '';
 
   if (!input) return;
 
@@ -76,14 +78,14 @@ function handleAnalyze() {
   results = findMatches(s => normalizeArabic(s) === raw);
   if (results.length) stageMessage = 'مرحلة 1: مطابقة دقيقة (مع تشكيل)';
 
-  // Stage 2: without tashkīl
+  // Stage 2: without tashkīل
   if (!results.length) {
     const bare = stripDiacritics(raw);
     results = findMatches(s => stripDiacritics(s) === bare);
     if (results.length) stageMessage = 'مرحلة 2: بدون تشكيل';
   }
 
-  // Stage 3: normalize letters (with tashkīl)
+  // Stage 3: normalize letters (with tashkīل)
   if (!results.length) {
     const norm = normalizeLetters(raw);
     results = findMatches(s => normalizeLetters(s) === norm);
@@ -113,6 +115,16 @@ function handleAnalyze() {
   results = dedupe(results);
   info.textContent = stageMessage || 'لا توجد نتائج.';
   renderResults(results);
+
+  // DEBUG OUTPUT
+  debug.innerHTML = `
+    <div style="font-family: sans-serif; background: #f0f0f0; border: 1px dashed #999; padding: 1em; margin-top: 1em;">
+      <div>🔤 الإدخال الخام: <code>${input}</code></div>
+      <div>🧼 بعد التطبيع: <code>${raw}</code></div>
+      <div>🔍 عدد النتائج المحتملة: ${results.length}</div>
+      <div>📋 المرحلة المختارة: ${stageMessage || '—'}</div>
+    </div>
+  `;
 }
 
 function renderResults(entries) {
@@ -137,6 +149,13 @@ function renderResults(entries) {
   panel.appendChild(ul);
 }
 
+async function inspectQacSurfaces() {
+  const map = await loadQacMap();
+  const surfaces = [...map.keys()];
+  console.log('🔍 Sample surfaces:', surfaces.slice(0, 20));
+}
+
+inspectQacSurfaces();
 main().catch(err => {
   console.error('Initialization error:', err);
   document.getElementById('step-info').textContent = `خطأ: ${err.message}`;
