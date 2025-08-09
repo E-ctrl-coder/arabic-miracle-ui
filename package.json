@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build-qac": "node scripts/build-qac.cjs",
-    "build": "npm run build-qac && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
