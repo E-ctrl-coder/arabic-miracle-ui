@@ -21,7 +21,8 @@ function normalizeLetters(s) {
 
 function stripAffixes(s) {
   const prefixes = ['وال','فال','بال','كال','لل','ال','و','ف','ب','ك','ل','س'];
-  const suffixes = ['ات','ان','ين','ون','ة','ه','ها','هم','نا','ي'];
+  
+  const suffixes =['ة','وا','ي','ك','ه','ها','نا','كم','كن','هم','هن','كما','ان','ون','ين','ات'];
   const stems = new Set([s]);
 
   prefixes.forEach(p => s.startsWith(p) && stems.add(s.slice(p.length)));
