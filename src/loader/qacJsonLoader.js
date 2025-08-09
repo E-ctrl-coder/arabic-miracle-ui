@@ -4,7 +4,7 @@
 export async function loadQacMap() {
   // Use a relative path so it works in static hosting and Codespaces previews.
   // If your host maps /public to the root, you can switch this to '/qac.json'.
-  const resp = await fetch('public/qac.json');
+  const resp = await fetch('/qac.json');
   if (!resp.ok) {
     throw new Error(`Failed to fetch public/qac.json: ${resp.status} ${resp.statusText}`);
   }
