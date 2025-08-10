@@ -1,4 +1,5 @@
 export function normalizeArabic(text) {
+  if (!text || typeof text !== "string") return "";
   return text
     .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "") // remove diacritics
     .replace(/ـ/g, "") // remove tatweel
@@ -10,6 +11,7 @@ export function normalizeArabic(text) {
 }
 
 export function stripAffixes(word) {
+  if (!word || typeof word !== "string") return "";
   const prefixes = ["ال", "و", "ف", "ب", "ك", "ل", "س"];
   const suffixes = ["ه", "ها", "هم", "هن", "كما", "كم", "نا", "ي", "ة", "ات"];
 
