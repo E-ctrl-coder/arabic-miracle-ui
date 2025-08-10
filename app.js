@@ -34,12 +34,11 @@
     el.log.textContent += line;
     el.log.scrollTop = el.log.scrollHeight;
     el.lastAction.textContent = msg;
-    // console.log(msg); // optional
   };
 
   // ---------- Normalization ----------
-  const TASHKEEL = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g; // Arabic diacritics
-  const TATWEEL = /\u0640/g; // ـ
+  const TASHKEEL = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g;
+  const TATWEEL = /\u0640/g;
 
   const normalizeNFC = (s = '') => s.normalize('NFC');
 
@@ -61,16 +60,11 @@
   const COMMON_SUFFIXES = ['', 'ة','ه','ي','ك','هم','ها','نا','ان','ون','ين','ات','كما','كم','كن','هن'];
 
   function affixDecomposes(word, core) {
-    // Both inputs should already be letter-normalized and diacritics stripped
     for (const p of COMMON_PREFIXES) {
       if (!word.startsWith(p)) continue;
       const rest = word.slice(p.length);
       if (!rest.includes(core)) continue;
-      if (rest === core) {
-        // suffix empty
-        return true;
-      }
-      // Require exact p + core + s equality
+      if (rest === core) return true;
       const after = rest.slice(core.length);
       if (after.length >= 0 && COMMON_SUFFIXES.includes(after)) {
         return true;
@@ -90,7 +84,7 @@
     }
   };
 
-  // ---------- Fetch helpers with path fallbacks ----------
+  // ---------- Fetch helpers ----------
   const JSON_PATHS = ['./qac.json', './public/qac.json'];
   const TXT_PATHS  = ['./qac.txt', './public/qac.txt'];
 
@@ -109,273 +103,147 @@
     }
     return null;
   }
-
-  async function tryFetchTxtLineCount(paths) {
+     async function tryFetchTxt(paths) {
     for (const url of paths) {
       try {
         const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
-        // Count non-empty lines
-        const count = text.split(/\r?\n/).filter(line => line.trim().length > 0).length;
-        log(`Counted ${count} non-empty lines in ${url}`);
-        return { url, count };
+        const lines = text.trim().split('\n');
+        log(`Loaded TXT from ${url} (${lines.length} lines)`);
+        return { url, lines };
       } catch (e) {
-        log(`TXT count failed at path: ${url} (${e.message})`);
+        log(`TXT load failed at path: ${url} (${e.message})`);
       }
     }
     return null;
   }
 
-  // ---------- Precompute normalization ----------
-  function shapeEntry(raw) {
-    const form = (raw && raw.form) ? String(raw.form) : '';
-    const stem = (raw && raw.stem) ? String(raw.stem) : '';
-    const root = (raw && raw.root) ? String(raw.root) : '';
-
-    const shaped = {
-      form, stem, root,
-      _n: {
-        form_nfc: normalizeNFC(form),
-        form_nodia: stripDiacritics(form),
-        form_letters: normalizeLetters(form),
-        form_letters_nodia: letterNoDia(form),
-
-        stem_nfc: normalizeNFC(stem),
-        stem_nodia: stripDiacritics(stem),
-        stem_letters: normalizeLetters(stem),
-        stem_letters_nodia: letterNoDia(stem),
-
-        root_nfc: normalizeNFC(root),
-        root_nodia: stripDiacritics(root),
-        root_letters: normalizeLetters(root),
-        root_letters_nodia: letterNoDia(root),
-      }
-    };
-    return shaped;
-  }
-
   // ---------- Loader ----------
   async function loadData() {
-    el.loaderState.textContent = 'Loading qac.json…';
-    const json = await tryFetchJson(JSON_PATHS);
-    if (!json) {
-      STATE.meta = { ...STATE.meta, integrity: 'ERROR', dataSource: 'Not found', jsonCount: 0 };
-      renderMeta();
-      el.loaderState.textContent = 'Failed: qac.json not found';
-      el.integrity.classList.add('error');
-      el.analyze.disabled = true;
-      return;
+    el.loaderState.textContent = 'Loading...';
+    const jsonResult = await tryFetchJson(JSON_PATHS);
+    const txtResult = await tryFetchTxt(TXT_PATHS);
+
+    if (jsonResult) {
+      STATE.entries = jsonResult.data;
+      STATE.meta.dataSource = jsonResult.url;
+      STATE.meta.jsonCount = jsonResult.data.length;
     }
 
-    const shaped = json.data.map(shapeEntry);
-    STATE.entries = shaped;
-    STATE.meta.dataSource = json.url;
-    STATE.meta.jsonCount = shaped.length;
-    el.loaderState.textContent = 'Loaded qac.json; validating with qac.txt…';
+    if (txtResult) {
+      STATE.meta.txtCount = txtResult.lines.length;
+    }
 
-    const txt = await tryFetchTxtLineCount(TXT_PATHS);
-    if (txt) {
-      STATE.meta.txtCount = txt.count;
+    // Integrity check
+    if (STATE.meta.jsonCount && STATE.meta.txtCount !== null) {
+      STATE.meta.integrity = (STATE.meta.jsonCount === STATE.meta.txtCount)
+        ? '✅ Match'
+        : '⚠️ Mismatch';
     } else {
-      STATE.meta.txtCount = null; // not found is acceptable; we proceed
+      STATE.meta.integrity = '❓ Unknown';
     }
 
-    // Integrity policy:
-    // - If txtCount exists and equals jsonCount => OK
-    // - If txtCount exists and differs => WARN (still usable)
-    // - If no txtCount => WARN (informational)
-    if (STATE.meta.txtCount == null) {
-      STATE.meta.integrity = 'WARN: qac.txt not found (skipped line-count validation)';
-    } else if (STATE.meta.txtCount === STATE.meta.jsonCount) {
-      STATE.meta.integrity = 'OK';
-    } else {
-      STATE.meta.integrity = `WARN: qac.json (${STATE.meta.jsonCount}) ≠ qac.txt rows (${STATE.meta.txtCount})`;
-    }
-
-    renderMeta();
-    el.loaderState.textContent = 'Ready';
-    el.analyze.disabled = false;
-    log('Initialization complete');
-  }
-
-  function renderMeta() {
+    // Update UI
     el.dataSource.textContent = STATE.meta.dataSource;
-    el.jsonCount.textContent = String(STATE.meta.jsonCount);
-    el.txtCount.textContent = STATE.meta.txtCount == null ? '—' : String(STATE.meta.txtCount);
+    el.jsonCount.textContent = STATE.meta.jsonCount;
+    el.txtCount.textContent = STATE.meta.txtCount ?? '—';
     el.integrity.textContent = STATE.meta.integrity;
-
-    el.integrity.classList.remove('ok', 'warn', 'error');
-    if (STATE.meta.integrity.startsWith('OK')) {
-      el.integrity.classList.add('badge', 'ok');
-    } else if (STATE.meta.integrity.startsWith('WARN')) {
-      el.integrity.classList.add('badge', 'warn');
-    } else if (STATE.meta.integrity.startsWith('ERROR')) {
-      el.integrity.classList.add('badge', 'err');
-    } else {
-      // Pending
-    }
+    el.loaderState.textContent = 'Ready';
   }
 
-  // ---------- Matching ----------
-  function matchQAC(inputWord, entries) {
-    const in_nfc = normalizeNFC(inputWord.trim());
-    const in_nodia = stripDiacritics(in_nfc);
-    const in_letters = normalizeLetters(in_nfc);
-    const in_letters_nodia = letterNoDia(in_nfc);
-
-    const s1 = [];
-    const s2 = [];
-    const s3 = [];
-
-    // Helpers to collect, with minimal duplication across stages
-    const seen = new Set();
-    const keyOf = (e) => `${e.form}␟${e.stem}␟${e.root}`;
-
-    // Stage 1: surface form (descending strictness)
-    for (const e of entries) {
-      if (e._n.form_nfc === in_nfc ||
-          e._n.form_nodia === in_nodia ||
-          e._n.form_letters === in_letters ||
-          e._n.form_letters_nodia === in_letters_nodia) {
-        const k = keyOf(e);
-        if (!seen.has(k)) {
-          seen.add(k);
-          s1.push(e);
-        }
-      }
-    }
-
-    // Stage 2: exact root/stem (same normalization levels)
-    if (s1.length === 0) {
-      for (const e of entries) {
-        if (
-          e._n.root_nfc === in_nfc || e._n.root_nodia === in_nodia ||
-          e._n.root_letters === in_letters || e._n.root_letters_nodia === in_letters_nodia ||
-          e._n.stem_nfc === in_nfc || e._n.stem_nodia === in_nodia ||
-          e._n.stem_letters === in_letters || e._n.stem_letters_nodia === in_letters_nodia
-        ) {
-          const k = keyOf(e);
-          if (!seen.has(k)) {
-            seen.add(k);
-            s2.push(e);
-          }
-        }
-      }
-    }
-
-    // Stage 3: partial match + affix validation (operate on letters+no-diacritics)
-    if (s1.length === 0 && s2.length === 0 && in_letters_nodia.length > 0) {
-      for (const e of entries) {
-        const cores = [
-          e._n.root_letters_nodia,
-          e._n.stem_letters_nodia
-        ].filter(Boolean);
-
-        for (const core of cores) {
-          if (!core) continue;
-          if (in_letters_nodia.includes(core) && affixDecomposes(in_letters_nodia, core)) {
-            const k = keyOf(e);
-            if (!seen.has(k)) {
-              seen.add(k);
-              s3.push(e);
-            }
-            break; // Entry accepted for Stage 3
-          }
-        }
-      }
-    }
-
-    return { s1, s2, s3 };
-  }
-
-  // ---------- Rendering ----------
-  function renderResults(groups) {
-    const limit = 200; // safety cap for rendering
-
-    const setSummary = (elSummary, arr, label) => {
-      if (arr.length === 0) {
-        elSummary.textContent = 'No matches.';
-      } else {
-        elSummary.textContent = `${arr.length} match${arr.length === 1 ? '' : 'es'} (${label})`;
-      }
-    };
-
-    setSummary(el.s1Summary, groups.s1, 'surface form');
-    setSummary(el.s2Summary, groups.s2, 'exact root/stem');
-    setSummary(el.s3Summary, groups.s3, 'partial + affix-validated');
-
-    const renderList = (listEl, arr) => {
-      listEl.innerHTML = '';
-      const toShow = arr.slice(0, limit);
-      for (const e of toShow) {
-        const li = document.createElement('li');
-        li.className = 'match';
-        li.innerHTML = `
-          <div class="fields">
-            <span class="kv"><span class="k">form:</span> <span class="v">${escapeHTML(e.form)}</span></span>
-            <span class="kv"><span class="k">stem:</span> <span class="v">${escapeHTML(e.stem)}</span></span>
-            <span class="kv"><span class="k">root:</span> <span class="v">${escapeHTML(e.root)}</span></span>
-          </div>
-          <div class="badges">
-            <span class="badge">QAC</span>
-          </div>
-        `;
-        listEl.appendChild(li);
-      }
-      if (arr.length > limit) {
-        const more = document.createElement('div');
-        more.className = 'summary';
-        more.textContent = `…and ${arr.length - limit} more not shown`;
-        listEl.appendChild(more);
-      }
-    };
-
-    renderList(el.s1List, groups.s1);
-    renderList(el.s2List, groups.s2);
-    renderList(el.s3List, groups.s3);
-  }
-
-  function escapeHTML(s) {
-    return String(s).replace(/[&<>"']/g, (ch) => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[ch]));
-  }
-
-  // ---------- Events ----------
+  // ---------- Wire UI ----------
   function wireUI() {
-    el.analyze.addEventListener('click', onAnalyze);
-    el.clear.addEventListener('click', onClear);
-    el.input.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter') {
-        onAnalyze();
-      }
+    el.input.addEventListener('input', () => {
+      const trimmed = el.input.value.trim();
+      el.analyze.disabled = trimmed.length === 0;
+    });
+
+    el.clear.addEventListener('click', () => {
+      el.input.value = '';
+      el.analyze.disabled = true;
+      clearResults();
+    });
+
+    el.analyze.addEventListener('click', () => {
+      const raw = el.input.value.trim();
+      if (!raw) return;
+      const normalized = letterNoDia(raw);
+      runAnalysis(normalized);
     });
   }
 
-  function onAnalyze() {
-    const word = el.input.value || '';
-    const trimmed = word.trim();
-    if (trimmed.length === 0) {
-      renderResults({ s1: [], s2: [], s3: [] });
-      log('Analyze: empty input');
-      return;
+  // ---------- Clear ----------
+  function clearResults() {
+    el.s1Summary.textContent = '';
+    el.s1List.innerHTML = '';
+    el.s2Summary.textContent = '';
+    el.s2List.innerHTML = '';
+    el.s3Summary.textContent = '';
+    el.s3List.innerHTML = '';
+  }
+
+  // ---------- Analysis ----------
+  function runAnalysis(word) {
+    clearResults();
+    const matches = {
+      exact: [],
+      stem: [],
+      root: [],
+    };
+
+    for (const entry of STATE.entries) {
+      const normForm = letterNoDia(entry.form);
+      const normStem = letterNoDia(entry.stem);
+      const normRoot = letterNoDia(entry.root);
+
+      if (word === normForm) {
+        matches.exact.push(entry);
+      } else if (word === normStem || affixDecomposes(word, normStem)) {
+        matches.stem.push(entry);
+      } else if (word === normRoot || affixDecomposes(word, normRoot)) {
+        matches.root.push(entry);
+      }
     }
-    const groups = matchQAC(trimmed, STATE.entries);
-    renderResults(groups);
-    log(`Analyze: "${trimmed}" => s1=${groups.s1.length}, s2=${groups.s2.length}, s3=${groups.s3.length}`);
+
+    renderMatches(matches);
+  }
+     // ---------- Render ----------
+  function renderMatches({ exact, stem, root }) {
+    const total = exact.length + stem.length + root.length;
+    log(`Found ${total} matches — Exact: ${exact.length}, Stem: ${stem.length}, Root: ${root.length}`);
+
+    el.s1Summary.textContent = `Exact matches (${exact.length})`;
+    el.s1List.innerHTML = exact.map(renderEntry).join('');
+
+    el.s2Summary.textContent = `Stem matches (${stem.length})`;
+    el.s2List.innerHTML = stem.map(renderEntry).join('');
+
+    el.s3Summary.textContent = `Root matches (${root.length})`;
+    el.s3List.innerHTML = root.map(renderEntry).join('');
   }
 
-  function onClear() {
-    el.input.value = '';
-    renderResults({ s1: [], s2: [], s3: [] });
-    el.input.focus();
-    log('Cleared input and results');
+  function renderEntry(entry) {
+    const safe = (s) => s ? s.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '—';
+    return `<li><strong>${safe(entry.form)}</strong> | Stem: ${safe(entry.stem)} | Root: ${safe(entry.root)}</li>`;
   }
 
-  // ---------- Boot ----------
+  // ---------- Init ----------
   window.addEventListener('DOMContentLoaded', async () => {
+    log('Initializing QAC Analyzer...');
     wireUI();
     await loadData();
+    el.analyze.disabled = true;
+    log('Ready.');
   });
 })();
+/* End of QAC Analyzer
+   - Context lock: QAC-only, no Nemlar
+   - Assets: qac.json + qac.txt only
+   - Integrity check: JSON count must match TXT line count
+   - UI: Fully browser-based, no terminal required
+   - Analysis: Tiered matcher (exact > stem > root), affix-aware
+   - Accessibility: All results rendered in plain HTML
+   - Reproducibility: Deterministic normalization, no hidden logic
+   - Onboarding: No config, no build step, no dependencies
+*/
