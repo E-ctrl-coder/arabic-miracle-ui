@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Text verifier — lines, bytes, SHA‑256</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font: 14px/1.4 system-ui, sans-serif; margin: 2rem; max-width: 900px; }
+    .row { display: flex; gap: 1rem; align-items: center; margin: .5rem 0; flex-wrap: wrap; }
+    textarea { width: 100%; height: 50vh; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code { background: #f4f4f4; padding: .2rem .4rem; border-radius: 4px; }
+    .metrics { display: grid; grid-template-columns: max-content 1fr; gap: .3rem .8rem; }
+    label { font-weight: 600; }
+    input[type=file] { padding: .4rem; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <h1>Text verifier</h1>
+  <div class="row">
+    <input id="file" type="file" />
+    <button id="clear">Clear</button>
+  </div>
+  <textarea id="txt" placeholder="Paste your text or load a file..."></textarea>
+  <div class="row metrics">
+    <label>Lines:</label><div id="lines">0</div>
+    <label>Bytes (UTF‑8):</label><div id="bytes">0</div>
+    <label>SHA‑256:</label><div class="mono" id="sha">—</div>
+  </div>
+
+<script>
+  const txt = document.getElementById('txt');
+  const lines = document.getElementById('lines');
+  const bytes = document.getElementById('bytes');
+  const sha = document.getElementById('sha');
+  const file = document.getElementById('file');
+  const clearBtn = document.getElementById('clear');
+  const enc = new TextEncoder();
+
+  function countLines(s) {
+    if (s.length === 0) return 0;
+    return s.split(/\r?\n/).length;
+  }
+
+  async function digestSHA256(s) {
+    const buf = enc.encode(s);
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    const bytes = Array.from(new Uint8Array(hash));
+    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function update() {
+    const s = txt.value;
+    lines.textContent = countLines(s);
+    bytes.textContent = enc.encode(s).length;
+    sha.textContent = s.length ? await digestSHA256(s) : '—';
+  }
+
+  txt.addEventListener('input', () => { update(); });
+
+  file.addEventListener('change', () => {
+    const f = file.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => { txt.value = reader.result || ''; update(); };
+    reader.readAsText(f, 'utf-8');
+  });
+
+  clearBtn.addEventListener('click', () => {
+    txt.value = '';
+    file.value = '';
+    update();
+    txt.focus();
+  });
+
+  update();
+</script>
+</body>
+</html>
