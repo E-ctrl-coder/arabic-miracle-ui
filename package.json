@@ -1,6 +1,5 @@
 {
   "name": "arabic-miracle-ui",
-  "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -9,21 +8,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.2.0"
-  },
-  "description": "Arabic word morphology analyzer for analyzer.elbagirdomain.com using QAC and Qur'an text",
-  "keywords": [
-    "arabic",
-    "quran",
-    "morphology",
-    "react",
-    "vite"
-  ],
-  "author": "",
-  "license": "MIT"
+    "@vitejs/plugin-react": "^4.0.0",
+    "vite": "^4.3.9"
+  }
 }
