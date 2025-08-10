@@ -1,25 +1,36 @@
-// Loader for QAC JSON and Quran text
-export async function loadQacData() {
+import { normalizeArabic, stripAffixes } from "../utils/normalizeArabic";
+
+export async function loadQACData() {
   const res = await fetch("/qac.json");
-  if (!res.ok) throw new Error("Failed to load qac.json");
   return await res.json();
 }
 
-export async function loadQuranText() {
-  const res = await fetch("/quraan.txt");
-  if (!res.ok) throw new Error("Failed to load quraan.txt");
-  const text = await res.text();
+export function searchWordInQAC(input, qacData) {
+  // Step 1: Exact match
+  let matches = qacData.filter(entry => entry.word === input);
+  if (matches.length > 0) return formatMatches(matches);
 
-  // Convert into dictionary: { "sura:ayah": "verse text" }
-  const verseMap = {};
-  text.split("\n").forEach(line => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    const match = trimmed.match(/^(\d+):(\d+)\s+(.*)$/);
-    if (match) {
-      const key = `${match[1]}:${match[2]}`;
-      verseMap[key] = match[3];
-    }
-  });
-  return verseMap;
+  // Step 2: Normalize & match
+  const normInput = normalizeArabic(input);
+  matches = qacData.filter(entry => normalizeArabic(entry.word) === normInput);
+  if (matches.length > 0) return formatMatches(matches);
+
+  // Step 3: Strip affixes & match with stems or roots
+  const stripped = stripAffixes(normInput);
+  matches = qacData.filter(entry =>
+    normalizeArabic(entry.stem) === stripped ||
+    normalizeArabic(entry.root) === stripped
+  );
+  return formatMatches(matches);
+}
+
+function formatMatches(entries) {
+  return entries.map(e => ({
+    word: e.word,
+    root: e.root,
+    pattern: e.pattern,
+    pos: e.pos,
+    meaning: e.english || "",
+    occurrences: e.occurrences || []
+  }));
 }
