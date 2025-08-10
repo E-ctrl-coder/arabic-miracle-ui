@@ -1,33 +1,78 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Arabic Morphology Analyzer</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QAC Analyzer — Deterministic Match Engine</title>
   <link rel="stylesheet" href="./styles.css" />
-  <script type="module" defer src="./src/index.js"></script>
 </head>
 <body>
-  <main>
-    <h1>تحليل صرفي للكلمات العربية</h1>
+  <header class="app-header">
+    <h1>QAC Analyzer</h1>
+    <p class="subtitle">Deterministic, context-locked, QAC-only loader and matcher</p>
+  </header>
 
-    <label for="lookup">أدخل كلمة للبحث:</label>
-    <input type="text" id="lookup" placeholder="مثال: بيسم" />
+  <section class="status-bar" aria-live="polite">
+    <div class="status-item"><strong>Data source:</strong> <span id="data-source">—</span></div>
+    <div class="status-item"><strong>JSON entries:</strong> <span id="json-count">0</span></div>
+    <div class="status-item"><strong>TXT rows (non-empty):</strong> <span id="txt-count">—</span></div>
+    <div class="status-item"><strong>Integrity:</strong> <span id="integrity">Pending</span></div>
+  </section>
 
-    <button id="go">تحليل</button>
+  <main class="container">
+    <section class="panel">
+      <h2>Analyze a word</h2>
+      <label for="word-input" class="field-label">Arabic word (unvocalized or vocalized)</label>
+      <div class="input-row">
+        <input id="word-input" class="word-input" type="text" dir="rtl" inputmode="text" autocomplete="off" placeholder="اكتب كلمة للتحليل…" />
+        <button id="analyze-btn" class="btn primary" disabled>Analyze</button>
+        <button id="clear-btn" class="btn">Clear</button>
+      </div>
+      <p class="hint">
+        Matching tiers: 1) surface form, 2) exact root/stem, 3) substring with validated affixes.
+      </p>
+    </section>
 
-    <div id="step-info" style="margin-top: 1em; font-weight: bold;">
-      <!-- وصف مرحلة المطابقة -->
-    </div>
+    <section class="panel">
+      <h2>Results</h2>
+      <div id="results">
+        <div class="stage" id="stage-1">
+          <h3>Stage 1 — Surface form</h3>
+          <div class="summary" id="stage-1-summary">No results yet.</div>
+          <ul class="match-list" id="stage-1-list"></ul>
+        </div>
+        <div class="stage" id="stage-2">
+          <h3>Stage 2 — Exact root/stem</h3>
+          <div class="summary" id="stage-2-summary">No results yet.</div>
+          <ul class="match-list" id="stage-2-list"></ul>
+        </div>
+        <div class="stage" id="stage-3">
+          <h3>Stage 3 — Partial match with affix validation</h3>
+          <div class="summary" id="stage-3-summary">No results yet.</div>
+          <ul class="match-list" id="stage-3-list"></ul>
+        </div>
+      </div>
+    </section>
 
-    <div id="qac-panel" class="card" style="margin-top: 1em;">
-      <!-- نتائج التحليل تظهر هنا -->
-    </div>
-
-    <!-- لوحة التشخيص -->
-    <div id="debug-panel" style="margin-top: 1em; border: 1px dashed #999; padding: 1em; background: #f9f9f9; font-family: sans-serif;">
-      <!-- بيانات التشخيص تظهر هنا -->
-    </div>
+    <section class="panel">
+      <h2>Diagnostics</h2>
+      <div class="diag">
+        <div class="diag-row"><strong>Loader state:</strong> <span id="loader-state">Initializing…</span></div>
+        <div class="diag-row"><strong>Last action:</strong> <span id="last-action">—</span></div>
+        <details>
+          <summary>View log</summary>
+          <pre id="log" class="log" aria-live="polite"></pre>
+        </details>
+      </div>
+    </section>
   </main>
+
+  <footer class="app-footer">
+    <p>
+      Context lock: QAC-only. No external datasets, no implicit parsing of qac.txt beyond line counts.
+    </p>
+  </footer>
+
+  <script src="./app.js" defer></script>
 </body>
 </html>
