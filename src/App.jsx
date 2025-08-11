@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { loadQACData, normalizeArabic, stemArabic, analyzeEntry } from './loader/qacJsonLoader';
+import { loadQACData, normalizeArabic, stemArabic, getVerseLocation } from './loader/qacJsonLoader';
 import './styles.css';
 
 export default function App() {
   const [qacData, setQacData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -14,11 +14,10 @@ export default function App() {
       try {
         const data = await loadQACData();
         setQacData(data);
-        setIsLoading(false);
       } catch (err) {
-        setError("Failed to load dictionary data");
-        setIsLoading(false);
-        console.error(err);
+        setError(`Data loading failed: ${err.message}`);
+      } finally {
+        setLoading(false);
       }
     };
     initialize();
@@ -30,29 +29,26 @@ export default function App() {
       return;
     }
 
-    // Clean and normalize input
-    const cleanInput = searchTerm.replace(/[^\p{Script=Arabic}\s]/gu, '');
-    const normTerm = normalizeArabic(cleanInput);
-    
-    if (normTerm.length < 1) {
+    const normalized = normalizeArabic(searchTerm);
+    if (!normalized) {
       setResults([]);
       return;
     }
 
     // Exact match search
     let matches = qacData.filter(entry => 
-      entry.normalizedForm === normTerm
+      entry.normalizedForm === normalized
     );
 
     // Stem match fallback
     if (matches.length === 0) {
-      const inputStem = stemArabic(normTerm);
+      const stem = stemArabic(normalized);
       matches = qacData.filter(entry => 
-        entry.stem === inputStem && inputStem.length > 2
+        entry.stem === stem && stem.length > 2
       );
     }
 
-    // Remove duplicates and limit results
+    // Remove duplicates
     const uniqueResults = [];
     const seen = new Set();
     
@@ -68,62 +64,61 @@ export default function App() {
   };
 
   return (
-    <div className="app-container">
-      <header>
-        <h1>Arabic Morphological Analyzer</h1>
-        <div className="search-box">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="أدخل كلمة"
-            dir="rtl"
-            lang="ar"
-          />
-          <button onClick={handleSearch}>بحث</button>
-        </div>
-      </header>
+    <div className="app">
+      <h1>Quranic Arabic Corpus Analyzer</h1>
+      
+      <div className="search-box">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="Enter Arabic word"
+          dir="rtl"
+          lang="ar"
+        />
+        <button onClick={handleSearch}>Search</button>
+      </div>
 
-      <main>
-        {isLoading ? (
-          <div className="loading">Loading dictionary...</div>
-        ) : error ? (
-          <div className="error">{error}</div>
-        ) : results.length > 0 ? (
-          <section className="results-section">
-            <h2>Analysis Results ({results.length})</h2>
-            <div className="results-grid">
-              {results.map((entry, index) => {
-                const analysis = analyzeEntry(entry);
-                return (
-                  <div key={`${analysis.location}-${index}`} className="analysis-card">
-                    <div className="arabic-word">{analysis.form}</div>
-                    <div className="morphological-data">
-                      <div><strong>Root:</strong> {analysis.root}</div>
-                      <div><strong>Lemma:</strong> {analysis.lemma}</div>
-                      <div><strong>POS:</strong> {analysis.tag}</div>
-                      <div className="location">Location: {analysis.location}</div>
-                    </div>
-                    <div className="segments">
-                      {analysis.prefixes.length > 0 && (
-                        <div>Prefixes: {analysis.prefixes.join(' + ')}</div>
+      {loading ? (
+        <div className="status">Loading corpus data...</div>
+      ) : error ? (
+        <div className="error">{error}</div>
+      ) : (
+        <div className="results">
+          {results.length > 0 ? (
+            <>
+              <h2>Found {results.length} matches</h2>
+              <div className="results-grid">
+                {results.map((entry, idx) => (
+                  <div key={idx} className="entry-card">
+                    <div className="arabic">{entry.form}</div>
+                    <div className="details">
+                      <p><strong>Root:</strong> {entry.root}</p>
+                      <p><strong>Lemma:</strong> {entry.lemma}</p>
+                      <p><strong>POS:</strong> {entry.tag}</p>
+                      <p className="location">
+                        Sura {entry.sura}:{entry.verse} (word {entry.wordNum})
+                      </p>
+                      {entry.segments.prefixes.length > 0 && (
+                        <p>Prefixes: {entry.segments.prefixes.join(' + ')}</p>
                       )}
-                      {analysis.suffixes.length > 0 && (
-                        <div>Suffixes: {analysis.suffixes.join(' + ')}</div>
+                      <p>Stem: {entry.segments.stem}</p>
+                      {entry.segments.suffixes.length > 0 && (
+                        <p>Suffixes: {entry.segments.suffixes.join(' + ')}</p>
                       )}
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="status">
+              {searchTerm ? 'No matches found' : 'Enter a word to search'}
             </div>
-          </section>
-        ) : (
-          <div className="no-results">
-            {searchTerm ? 'No results found' : 'Enter a word to begin analysis'}
-          </div>
-        )}
-      </main>
+          )}
+        </div>
+      )}
     </div>
   );
 }
