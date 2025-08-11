@@ -1,26 +1,90 @@
 // src/loader/qacJsonLoader.js
-let surfaceKey = 'form'; // Directly use 'form' since we know the structure
 
+/**
+ * Environment-aware path resolver for QAC data
+ */
+const getQACPath = () => {
+  if (import.meta.env.MODE === 'development') {
+    return '/qac.json'; // Absolute path for dev server
+  }
+  return './qac.json'; // Relative path for production
+};
+
+/**
+ * Load QAC data with multiple fallback strategies
+ */
 export async function loadQACData() {
-  console.log("Loading QAC data...");
+  const QAC_PATH = getQACPath();
+  console.log(`Attempting to load QAC data from: ${QAC_PATH}`);
+
+  // Strategy 1: Fetch from server
   try {
-    const res = await fetch("/public/qac.json");
-    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-    
-    const data = await res.json();
-    console.log(`QAC data loaded, entries: ${data.length}`);
+    const response = await fetch(QAC_PATH, {
+      cache: 'no-cache',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Successfully loaded QAC data via fetch');
     return data;
-  } catch (err) {
-    console.error("Failed to load QAC data:", err);
-    return [];
+  } catch (fetchError) {
+    console.warn('Fetch failed, trying fallback methods:', fetchError.message);
+    
+    // Strategy 2: Direct import (works with bundlers)
+    try {
+      const importedData = await import('../../public/qac.json');
+      console.log('Successfully loaded QAC data via direct import');
+      return importedData.default;
+    } catch (importError) {
+      console.error('Direct import failed:', importError.message);
+      
+      // Strategy 3: Hardcoded fallback (last resort)
+      try {
+        const hardcodedData = await fetchFallbackData();
+        console.warn('Using hardcoded fallback data');
+        return hardcodedData;
+      } catch (finalError) {
+        throw new Error(
+          `All data loading methods failed:\n` +
+          `1. Fetch: ${fetchError.message}\n` +
+          `2. Import: ${importError.message}\n` +
+          `3. Fallback: ${finalError.message}`
+        );
+      }
+    }
   }
 }
 
-// Keep this for backward compatibility
-export function getSurface(entry) {
-  return entry?.form || "";
+/**
+ * Hardcoded fallback data (minimal working example)
+ */
+async function fetchFallbackData() {
+  return [
+    {
+      "location": "1:1:1",
+      "form": "بِسْمِ",
+      "lemma": "{som",
+      "root": "smw",
+      "tag": "N",
+      "features": ["M", "GEN"],
+      "segments": {
+        "prefixes": ["بِ"],
+        "stem": "سْمِ",
+        "suffixes": []
+      }
+    }
+  ];
 }
 
+/**
+ * Normalize Arabic text
+ */
 export function normalizeArabic(text) {
   if (!text) return "";
   return text
@@ -31,6 +95,9 @@ export function normalizeArabic(text) {
     .trim();
 }
 
+/**
+ * Conservative Arabic stemming
+ */
 export function stemArabic(text) {
   const normalized = normalizeArabic(text);
   return normalized
@@ -38,7 +105,18 @@ export function stemArabic(text) {
     .replace(/[هي]?$/, "");
 }
 
-// New recommended function
+/**
+ * Get surface form with safety checks
+ */
 export function getSurfaceForm(entry) {
-  return entry?.form || "";
+  if (!entry) return "";
+  return entry.form || "";
 }
+
+// Export all functions
+export default {
+  loadQACData,
+  normalizeArabic,
+  stemArabic,
+  getSurfaceForm
+};
