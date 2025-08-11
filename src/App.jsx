@@ -1,93 +1,70 @@
 import React, { useState, useEffect } from "react";
+import { loadQACData, normalizeArabic, stemArabic } from "./loader/qacJsonLoader";
+import "./styles.css";
 
 export default function App() {
   const [qacData, setQacData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [inputWord, setInputWord] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
 
-  // Load qac.json on mount
   useEffect(() => {
-    console.log("App.jsx mounted — starting QAC load...");
-
-    fetch("/qac.json")
-      .then((res) => {
-        console.log("Fetched qac.json, status:", res.status);
-        return res.json();
-      })
-      .then((data) => {
-        console.log("QAC data loaded, entries:", data.length);
-        setQacData(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error loading qac.json:", err);
-        setLoading(false);
-      });
+    async function init() {
+      const data = await loadQACData();
+      setQacData(data);
+    }
+    init();
   }, []);
 
-  // Search handler
-  const handleSearch = () => {
-    console.log("Search clicked. Input:", inputWord);
-    if (!inputWord.trim()) {
-      console.warn("Empty input — no search performed.");
+  function handleSearch() {
+    console.log("Search clicked. Input:", searchTerm);
+
+    const normTerm = normalizeArabic(searchTerm);
+    console.log("Normalized search term:", normTerm);
+
+    if (!normTerm) {
+      setResults([]);
       return;
     }
 
-    const normalized = inputWord.trim();
-    console.log("Normalized search term:", normalized);
+    // First pass: exact match
+    let matches = qacData.filter(entry => {
+      const surface = normalizeArabic(entry.word || entry[0]);
+      return surface === normTerm;
+    });
 
-    const matches = qacData.filter(
-      (entry) =>
-        entry.word === normalized ||
-        entry.root === normalized ||
-        entry.lemma === normalized
-    );
+    // Second pass: match by stem
+    if (matches.length === 0) {
+      const stemTerm = stemArabic(normTerm);
+      matches = qacData.filter(entry => {
+        const surfaceStem = stemArabic(entry.word || entry[0]);
+        return surfaceStem === stemTerm;
+      });
+    }
 
-    console.log("Matches found:", matches.length);
+    console.log(`Matches found: ${matches.length}`);
     setResults(matches);
-  };
-
-  if (loading) {
-    return <div style={{ padding: "2rem" }}>Loading QAC data...</div>;
   }
 
   return (
-    <div style={{ padding: "2rem" }}>
-      <h1>QAC Analyzer — Debug Mode</h1>
-      <div style={{ marginBottom: "1rem" }}>
-        <input
-          type="text"
-          placeholder="Enter Arabic word..."
-          value={inputWord}
-          onChange={(e) => setInputWord(e.target.value)}
-          style={{ fontSize: "1.2rem", padding: "0.5rem" }}
-        />
-        <button
-          onClick={handleSearch}
-          style={{
-            marginLeft: "1rem",
-            fontSize: "1.2rem",
-            padding: "0.5rem 1rem",
-          }}
-        >
-          Search
-        </button>
-      </div>
+    <div className="app">
+      <h1>AC Analyzer — Normalized Search</h1>
+      <input
+        type="text"
+        value={searchTerm}
+        placeholder="أدخل كلمة"
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+      <button onClick={handleSearch}>Search</button>
 
-      <div>
-        {results.length === 0 ? (
-          <p>No results yet.</p>
-        ) : (
-          <ul>
-            {results.map((r, i) => (
-              <li key={i}>
-                {r.word} — Root: {r.root} — Lemma: {r.lemma}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {results.length === 0 ? (
+        <p>No results yet.</p>
+      ) : (
+        <ul>
+          {results.map((r, idx) => (
+            <li key={idx}>{r.word || r[0]}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
