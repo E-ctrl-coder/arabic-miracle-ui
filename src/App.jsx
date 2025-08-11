@@ -1,82 +1,93 @@
 import React, { useState, useEffect } from "react";
-import { loadQACData, searchWordInQAC } from "./loader/qacJsonLoader";
-import { normalizeArabic } from "./utils/normalizeArabic";
 
 export default function App() {
-  const [word, setWord] = useState("");
+  const [qacData, setQacData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [inputWord, setInputWord] = useState("");
   const [results, setResults] = useState([]);
-  const [verses, setVerses] = useState({});
-  const [loading, setLoading] = useState(false);
 
-  const handleSearch = async () => {
-    setLoading(true);
-    const qacData = await loadQACData();
-    const matches = searchWordInQAC(word, qacData);
-    setResults(matches);
-    setLoading(false);
-  };
+  // Load qac.json on mount
+  useEffect(() => {
+    console.log("App.jsx mounted — starting QAC load...");
 
-  const loadVerse = async (sura, ayah) => {
-    const response = await fetch("/quraan.txt");
-    const text = await response.text();
-    const lines = text.split("\n");
-    const verseText = lines.find(line => line.startsWith(`${sura}|${ayah}|`));
-    if (verseText) {
-      const parts = verseText.split("|");
-      setVerses(prev => ({ ...prev, [`${sura}:${ayah}`]: parts[2] }));
+    fetch("/qac.json")
+      .then((res) => {
+        console.log("Fetched qac.json, status:", res.status);
+        return res.json();
+      })
+      .then((data) => {
+        console.log("QAC data loaded, entries:", data.length);
+        setQacData(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error loading qac.json:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  // Search handler
+  const handleSearch = () => {
+    console.log("Search clicked. Input:", inputWord);
+    if (!inputWord.trim()) {
+      console.warn("Empty input — no search performed.");
+      return;
     }
+
+    const normalized = inputWord.trim();
+    console.log("Normalized search term:", normalized);
+
+    const matches = qacData.filter(
+      (entry) =>
+        entry.word === normalized ||
+        entry.root === normalized ||
+        entry.lemma === normalized
+    );
+
+    console.log("Matches found:", matches.length);
+    setResults(matches);
   };
+
+  if (loading) {
+    return <div style={{ padding: "2rem" }}>Loading QAC data...</div>;
+  }
 
   return (
-    <div className="container">
-      <h1>Arabic Word Morphology Analyzer</h1>
-      <div className="search-bar">
+    <div style={{ padding: "2rem" }}>
+      <h1>QAC Analyzer — Debug Mode</h1>
+      <div style={{ marginBottom: "1rem" }}>
         <input
           type="text"
-          value={word}
-          onChange={(e) => setWord(e.target.value)}
-          placeholder="أدخل كلمة عربية"
+          placeholder="Enter Arabic word..."
+          value={inputWord}
+          onChange={(e) => setInputWord(e.target.value)}
+          style={{ fontSize: "1.2rem", padding: "0.5rem" }}
         />
-        <button onClick={handleSearch} disabled={!word}>
-          بحث
+        <button
+          onClick={handleSearch}
+          style={{
+            marginLeft: "1rem",
+            fontSize: "1.2rem",
+            padding: "0.5rem 1rem",
+          }}
+        >
+          Search
         </button>
       </div>
 
-      {loading && <p>جارٍ البحث...</p>}
-
-      {results.length > 0 && (
-        <div className="results">
-          {results.map((res, idx) => (
-            <div key={idx} className="result-card">
-              <p><strong>الكلمة:</strong> {res.word}</p>
-              <p><strong>الجذر:</strong> <span className="root">{res.root}</span></p>
-              <p><strong>الوزن:</strong> {res.pattern}</p>
-              <p><strong>النوع:</strong> {res.pos}</p>
-              <p><strong>المعنى:</strong> {res.meaning || "—"}</p>
-              <div className="occurrences">
-                <strong>التكرار:</strong>
-                <ul>
-                  {res.occurrences.map((occ, i) => (
-                    <li key={i}>
-                      <button
-                        onClick={() => loadVerse(occ.sura, occ.ayah)}
-                        className="verse-btn"
-                      >
-                        {occ.sura}:{occ.ayah}
-                      </button>
-                      {verses[`${occ.sura}:${occ.ayah}`] && (
-                        <span className="verse-text">
-                          {verses[`${occ.sura}:${occ.ayah}`]}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div>
+        {results.length === 0 ? (
+          <p>No results yet.</p>
+        ) : (
+          <ul>
+            {results.map((r, i) => (
+              <li key={i}>
+                {r.word} — Root: {r.root} — Lemma: {r.lemma}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
