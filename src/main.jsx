@@ -1,12 +1,35 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import "./styles.css"; // ✅ match actual filename
+// src/main.jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './styles.css';
 
-console.log("main.jsx starting...");
+class ErrorBoundary extends React.Component {
+  state = { hasError: false };
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('React Error:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="error">Application Error</div>;
+    }
+    return this.props.children;
+  }
+}
+
+console.log('Application initializing...');
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );
