@@ -1,122 +1,72 @@
-// src/loader/qacJsonLoader.js
+// Robust QAC data loader with enhanced Arabic processing
+const QAC_PATH = import.meta.env.MODE === 'development' ? '/qac.json' : './qac.json';
 
-/**
- * Environment-aware path resolver for QAC data
- */
-const getQACPath = () => {
-  if (import.meta.env.MODE === 'development') {
-    return '/qac.json'; // Absolute path for dev server
-  }
-  return './qac.json'; // Relative path for production
+const ARABIC_NORMALIZATION_MAP = {
+  // Combine all Arabic character variants
+  'إ': 'ا', 'أ': 'ا', 'آ': 'ا', 'ء': 'ا',
+  'ة': 'ه', 'ى': 'ي', 'ؤ': 'و', 'ئ': 'ي',
+  // Diacritics removal
+  '\u064B': '', '\u064C': '', '\u064D': '', '\u064E': '', 
+  '\u064F': '', '\u0650': '', '\u0651': '', '\u0652': '',
+  '\u0670': '', '\u0640': ''
 };
 
-/**
- * Load QAC data with multiple fallback strategies
- */
-export async function loadQACData() {
-  const QAC_PATH = getQACPath();
-  console.log(`Attempting to load QAC data from: ${QAC_PATH}`);
-
-  // Strategy 1: Fetch from server
-  try {
-    const response = await fetch(QAC_PATH, {
-      cache: 'no-cache',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} - ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log('Successfully loaded QAC data via fetch');
-    return data;
-  } catch (fetchError) {
-    console.warn('Fetch failed, trying fallback methods:', fetchError.message);
-    
-    // Strategy 2: Direct import (works with bundlers)
-    try {
-      const importedData = await import('../../public/qac.json');
-      console.log('Successfully loaded QAC data via direct import');
-      return importedData.default;
-    } catch (importError) {
-      console.error('Direct import failed:', importError.message);
-      
-      // Strategy 3: Hardcoded fallback (last resort)
-      try {
-        const hardcodedData = await fetchFallbackData();
-        console.warn('Using hardcoded fallback data');
-        return hardcodedData;
-      } catch (finalError) {
-        throw new Error(
-          `All data loading methods failed:\n` +
-          `1. Fetch: ${fetchError.message}\n` +
-          `2. Import: ${importError.message}\n` +
-          `3. Fallback: ${finalError.message}`
-        );
-      }
-    }
-  }
-}
-
-/**
- * Hardcoded fallback data (minimal working example)
- */
-async function fetchFallbackData() {
-  return [
-    {
-      "location": "1:1:1",
-      "form": "بِسْمِ",
-      "lemma": "{som",
-      "root": "smw",
-      "tag": "N",
-      "features": ["M", "GEN"],
-      "segments": {
-        "prefixes": ["بِ"],
-        "stem": "سْمِ",
-        "suffixes": []
-      }
-    }
-  ];
-}
-
-/**
- * Normalize Arabic text
- */
 export function normalizeArabic(text) {
   if (!text) return "";
   return text
-    .normalize('NFKD')
-    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
-    .replace(/[إأآء]/g, "ا")
-    .replace(/[ةئ]/g, "ه")
+    .split('')
+    .map(char => ARABIC_NORMALIZATION_MAP[char] || char)
+    .join('')
+    .replace(/[^\u0600-\u06FF]/g, "")
     .trim();
 }
 
-/**
- * Conservative Arabic stemming
- */
-export function stemArabic(text) {
-  const normalized = normalizeArabic(text);
-  return normalized
-    .replace(/^[والفبكلس]/, "")
-    .replace(/[هي]?$/, "");
+export function stemArabic(word) {
+  const normalized = normalizeArabic(word);
+  if (normalized.length < 3) return normalized; // Too short for stemming
+  
+  // Enhanced prefix/suffix patterns
+  const prefixes = [/^و/, /^ف/, /^ب/, /^ك/, /^ل/, /^ال/, /^س/];
+  const suffixes = [/ه$/, /ها$/, /هم$/, /هن$/, /كما$/, /كم$/, /نا$/, /ي$/, /ك$/, /وا$/, /ات$/, /ون$/, /ين$/, /ان$/];
+  
+  let stemmed = normalized;
+  prefixes.forEach(pattern => stemmed = stemmed.replace(pattern, ''));
+  suffixes.forEach(pattern => stemmed = stemmed.replace(pattern, ''));
+  
+  return stemmed.length > 1 ? stemmed : normalized; // Fallback to original if stem too short
 }
 
-/**
- * Get surface form with safety checks
- */
-export function getSurfaceForm(entry) {
-  if (!entry) return "";
-  return entry.form || "";
+export async function loadQACData() {
+  try {
+    console.log(`Loading QAC data from: ${QAC_PATH}`);
+    const response = await fetch(QAC_PATH);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error("Invalid QAC data format");
+    
+    // Pre-process data for faster searching
+    return data.map(entry => ({
+      ...entry,
+      normalizedForm: normalizeArabic(entry.form),
+      stem: stemArabic(entry.form)
+    }));
+  } catch (error) {
+    console.error("QAC data loading failed:", error);
+    return [];
+  }
 }
 
-// Export all functions
-export default {
-  loadQACData,
-  normalizeArabic,
-  stemArabic,
-  getSurfaceForm
-};
+export function analyzeEntry(entry) {
+  if (!entry) return null;
+  return {
+    form: entry.form,
+    normalized: entry.normalizedForm || normalizeArabic(entry.form),
+    root: entry.root || "N/A",
+    lemma: entry.lemma || "N/A",
+    tag: entry.tag || "N/A",
+    location: entry.location,
+    prefixes: entry.segments?.prefixes || [],
+    suffixes: entry.segments?.suffixes || []
+  };
+}
