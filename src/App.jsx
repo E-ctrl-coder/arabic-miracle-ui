@@ -1,111 +1,129 @@
-import React, { useState, useEffect } from "react";
-import { loadQACData, normalizeArabic, stemArabic, getSurfaceForm } from "./loader/qacJsonLoader";
-import "./styles.css";
+import React, { useState, useEffect } from 'react';
+import { loadQACData, normalizeArabic, stemArabic, analyzeEntry } from './loader/qacJsonLoader';
+import './styles.css';
 
 export default function App() {
   const [qacData, setQacData] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function init() {
+    const initialize = async () => {
       try {
-        setIsLoading(true);
         const data = await loadQACData();
         setQacData(data);
-      } catch (err) {
-        console.error("Failed to load data:", err);
-        setError("Failed to load dictionary data");
-      } finally {
         setIsLoading(false);
+      } catch (err) {
+        setError("Failed to load dictionary data");
+        setIsLoading(false);
+        console.error(err);
       }
-    }
-    init();
+    };
+    initialize();
   }, []);
 
-  function handleSearch() {
+  const handleSearch = () => {
     if (!searchTerm.trim()) {
       setResults([]);
       return;
     }
 
-    const normTerm = normalizeArabic(searchTerm);
-    console.log("Searching for:", normTerm);
+    // Clean and normalize input
+    const cleanInput = searchTerm.replace(/[^\p{Script=Arabic}\s]/gu, '');
+    const normTerm = normalizeArabic(cleanInput);
+    
+    if (normTerm.length < 1) {
+      setResults([]);
+      return;
+    }
 
     // Exact match search
-    let matches = qacData.filter(entry => {
-      const surface = normalizeArabic(getSurfaceForm(entry));
-      return surface === normTerm;
+    let matches = qacData.filter(entry => 
+      entry.normalizedForm === normTerm
+    );
+
+    // Stem match fallback
+    if (matches.length === 0) {
+      const inputStem = stemArabic(normTerm);
+      matches = qacData.filter(entry => 
+        entry.stem === inputStem && inputStem.length > 2
+      );
+    }
+
+    // Remove duplicates and limit results
+    const uniqueResults = [];
+    const seen = new Set();
+    
+    matches.forEach(entry => {
+      const key = `${entry.form}-${entry.location}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueResults.push(entry);
+      }
     });
 
-    // Stem-based fallback search
-    if (matches.length === 0) {
-      const stemTerm = stemArabic(normTerm);
-      matches = qacData.filter(entry => {
-        const surfaceStem = stemArabic(getSurfaceForm(entry));
-        return surfaceStem === stemTerm;
-      });
-    }
-
-    setResults(matches);
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
+    setResults(uniqueResults.slice(0, 100));
   };
 
   return (
-    <div className="app">
-      <h1>Arabic Corpus Analyzer</h1>
-      
-      {error ? (
-        <div className="error-message">{error}</div>
-      ) : isLoading ? (
-        <div className="loading">Loading dictionary...</div>
-      ) : (
-        <>
-          <div className="search-box">
-            <input
-              type="text"
-              value={searchTerm}
-              placeholder="أدخل كلمة"
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={handleKeyPress}
-              dir="rtl"
-              lang="ar"
-            />
-            <button onClick={handleSearch}>بحث</button>
-          </div>
+    <div className="app-container">
+      <header>
+        <h1>Arabic Morphological Analyzer</h1>
+        <div className="search-box">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="أدخل كلمة"
+            dir="rtl"
+            lang="ar"
+          />
+          <button onClick={handleSearch}>بحث</button>
+        </div>
+      </header>
 
-          {results.length === 0 && searchTerm ? (
-            <p>No results found for "{searchTerm}"</p>
-          ) : results.length > 0 ? (
-            <div className="results">
-              <h2>Results ({results.length})</h2>
-              <ul>
-                {results.map((entry, idx) => (
-                  <li key={idx}>
-                    <div className="entry">
-                      <span className="arabic">{getSurfaceForm(entry)}</span>
-                      <div className="details">
-                        <span>Root: {entry.root || "N/A"}</span>
-                        <span>Lemma: {entry.lemma || "N/A"}</span>
-                        <span>Tag: {entry.tag || "N/A"}</span>
-                      </div>
+      <main>
+        {isLoading ? (
+          <div className="loading">Loading dictionary...</div>
+        ) : error ? (
+          <div className="error">{error}</div>
+        ) : results.length > 0 ? (
+          <section className="results-section">
+            <h2>Analysis Results ({results.length})</h2>
+            <div className="results-grid">
+              {results.map((entry, index) => {
+                const analysis = analyzeEntry(entry);
+                return (
+                  <div key={`${analysis.location}-${index}`} className="analysis-card">
+                    <div className="arabic-word">{analysis.form}</div>
+                    <div className="morphological-data">
+                      <div><strong>Root:</strong> {analysis.root}</div>
+                      <div><strong>Lemma:</strong> {analysis.lemma}</div>
+                      <div><strong>POS:</strong> {analysis.tag}</div>
+                      <div className="location">Location: {analysis.location}</div>
                     </div>
-                  </li>
-                ))}
-              </ul>
+                    <div className="segments">
+                      {analysis.prefixes.length > 0 && (
+                        <div>Prefixes: {analysis.prefixes.join(' + ')}</div>
+                      )}
+                      {analysis.suffixes.length > 0 && (
+                        <div>Suffixes: {analysis.suffixes.join(' + ')}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            <p>Enter a word to begin search</p>
-          )}
-        </>
-      )}
+          </section>
+        ) : (
+          <div className="no-results">
+            {searchTerm ? 'No results found' : 'Enter a word to begin analysis'}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
