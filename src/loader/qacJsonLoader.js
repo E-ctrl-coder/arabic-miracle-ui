@@ -1,44 +1,37 @@
-import { normalizeArabic, stripAffixes } from "../utils/normalizeArabic";
-
+// src/loader/qacJsonLoader.js
 export async function loadQACData() {
-  const res = await fetch("/qac.json");
-  return await res.json();
+  console.log("main.jsx starting...");
+  try {
+    const res = await fetch("/qac.json");
+    console.log(`Fetched qac.json, status: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to load qac.json: ${res.statusText}`);
+
+    const data = await res.json();
+    console.log(`QAC data loaded, entries: ${data.length}`);
+    return data;
+  } catch (err) {
+    console.error("Error loading QAC data:", err);
+    return [];
+  }
 }
 
-export function searchWordInQAC(input, qacData) {
-  if (!input || typeof input !== "string") return [];
-
-  // Step 1: Exact match
-  let matches = qacData.filter(entry => entry.word === input);
-  if (matches.length > 0) return formatMatches(matches);
-
-  // Step 2: Normalize & match
-  const normInput = normalizeArabic(input);
-  matches = qacData.filter(entry => {
-    if (!entry.word) return false;
-    return normalizeArabic(entry.word) === normInput;
-  });
-  if (matches.length > 0) return formatMatches(matches);
-
-  // Step 3: Strip affixes & match with stems or roots
-  const stripped = stripAffixes(normInput);
-  matches = qacData.filter(entry => {
-    if (!entry.stem && !entry.root) return false;
-    const stemNorm = entry.stem ? normalizeArabic(entry.stem) : "";
-    const rootNorm = entry.root ? normalizeArabic(entry.root) : "";
-    return stemNorm === stripped || rootNorm === stripped;
-  });
-
-  return formatMatches(matches);
+// Arabic normalization — remove diacritics, tatweel, normalize alif/ya
+export function normalizeArabic(text) {
+  if (!text) return "";
+  return text
+    .replace(/[\u064B-\u065F\u0670]/g, "") // remove harakat
+    .replace(/\u0640/g, "") // remove tatweel
+    .replace(/[إأآ]/g, "ا") // normalize alif forms
+    .replace(/ى/g, "ي") // normalize ya
+    .trim();
 }
 
-function formatMatches(entries) {
-  return entries.map(e => ({
-    word: e.word || "",
-    root: e.root || "",
-    pattern: e.pattern || "",
-    pos: e.pos || "",
-    meaning: e.english || "",
-    occurrences: e.occurrences || []
-  }));
+// Very basic stemming: remove common prefixes/suffixes
+export function stemArabic(text) {
+  let t = normalizeArabic(text);
+  // Common prefixes
+  t = t.replace(/^(ال|و|ف|ب|ك|ل|س)/, "");
+  // Common suffixes
+  t = t.replace(/(ه|ها|هم|هن|كما|كم|نا|ي|ك)$/g, "");
+  return t;
 }
