@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { loadQACData, normalizeArabic, stemArabic } from "./loader/qacJsonLoader";
+import { loadQACData, normalizeArabic, stemArabic, getSurface } from "./loader/qacJsonLoader";
 import "./styles.css";
 
 export default function App() {
@@ -28,15 +28,15 @@ export default function App() {
 
     // First pass: exact match
     let matches = qacData.filter(entry => {
-      const surface = normalizeArabic(entry.word || entry[0]);
+      const surface = normalizeArabic(getSurface(entry));
       return surface === normTerm;
     });
 
-    // Second pass: match by stem
+    // Second pass: stem match
     if (matches.length === 0) {
       const stemTerm = stemArabic(normTerm);
       matches = qacData.filter(entry => {
-        const surfaceStem = stemArabic(entry.word || entry[0]);
+        const surfaceStem = stemArabic(getSurface(entry));
         return surfaceStem === stemTerm;
       });
     }
@@ -61,7 +61,7 @@ export default function App() {
       ) : (
         <ul>
           {results.map((r, idx) => (
-            <li key={idx}>{r.word || r[0]}</li>
+            <li key={idx}>{getSurface(r)}</li>
           ))}
         </ul>
       )}
