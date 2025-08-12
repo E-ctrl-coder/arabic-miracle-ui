@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { loadQACData, normalizeArabic, stemArabic, loadQuranText, getVerseText } from './loader/qacJsonLoader';
+import React, { useState, useEffect, useMemo } from 'react';
+import { loadQACData, normalizeArabic, loadQuranText, getVerseText } from './loader/qacJsonLoader';
 import './styles.css';
 
 export default function App() {
@@ -10,10 +10,19 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Memoized valid affixes (normalized once)
+  const validAffixes = useMemo(() => [
+    // Single-letter prefixes
+    'و', 'ف', 'ب', 'ك', 'ل', 'س', 'ا',
+    // Compound prefixes
+    'ال', 'وال', 'بال', 'فال', 'كال', 'ولل',
+    // Suffixes
+    'ه', 'ها', 'هم', 'هن', 'ي', 'ك', 'نا', 'ان', 'ون', 'ين'
+  ].map(normalizeArabic), []);
+
   useEffect(() => {
     const initialize = async () => {
       try {
-        // Load both datasets in parallel
         const [data, _] = await Promise.all([
           loadQACData(),
           loadQuranText()
@@ -28,44 +37,55 @@ export default function App() {
     initialize();
   }, []);
 
+  const isValidAffix = (text) => {
+    if (!text) return true; // No affix is valid
+    return validAffixes.some(affix => 
+      text.includes(affix) || affix.includes(text)
+    );
+  };
+
   const handleSearch = () => {
-    if (!searchTerm.trim()) {
+    const normalizedInput = normalizeArabic(searchTerm.trim());
+    
+    // Early returns for invalid cases
+    if (!normalizedInput || normalizedInput.length < 2) {
       setResults([]);
       return;
     }
 
-    const normalized = normalizeArabic(searchTerm);
-    if (!normalized) {
-      setResults([]);
-      return;
-    }
-
-    // Exact match search
-    let matches = qacData.filter(entry => 
-      entry.normalizedForm === normalized
+    // 1. Exact match search
+    const exactMatches = qacData.filter(entry => 
+      normalizeArabic(entry.form) === normalizedInput
     );
 
-    // Stem match fallback
-    if (matches.length === 0) {
-      const stem = stemArabic(normalized);
-      matches = qacData.filter(entry => 
-        entry.stem === stem && stem.length > 2
-      );
+    if (exactMatches.length > 0) {
+      setResults(exactMatches);
+      return;
     }
 
-    // Remove duplicates
-    const uniqueResults = [];
-    const seen = new Set();
-    
-    matches.forEach(entry => {
-      const key = `${entry.form}-${entry.location}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueResults.push(entry);
-      }
+    // 2. Stem/Root search with affix validation
+    const validMatches = qacData.filter(entry => {
+      const normalizedStem = normalizeArabic(entry.stem);
+      const normalizedRoot = normalizeArabic(entry.root);
+      
+      // Find which part matches (prioritize stem over root)
+      const matchedPart = normalizedInput.includes(normalizedStem) 
+        ? normalizedStem 
+        : normalizedInput.includes(normalizedRoot) 
+          ? normalizedRoot 
+          : null;
+
+      if (!matchedPart) return false;
+      
+      // Extract affixes
+      const matchIndex = normalizedInput.indexOf(matchedPart);
+      const prefix = normalizedInput.substring(0, matchIndex);
+      const suffix = normalizedInput.substring(matchIndex + matchedPart.length);
+      
+      return isValidAffix(prefix) && isValidAffix(suffix);
     });
 
-    setResults(uniqueResults.slice(0, 100));
+    setResults(validMatches);
   };
 
   const handleVerseClick = (sura, verse) => {
@@ -102,20 +122,20 @@ export default function App() {
           <h2>Found {results.length} matches</h2>
           <div className="results-grid">
             {results.map((entry, idx) => (
-              <div key={idx} className="entry-card">
+              <div key={`${entry.location}-${idx}`} className="entry-card">
                 <div className="arabic">{entry.form}</div>
                 <div className="details">
-                  <p><strong>Root:</strong> {entry.root}</p>
-                  <p><strong>Lemma:</strong> {entry.lemma}</p>
-                  <p><strong>POS:</strong> {entry.tag}</p>
+                  <p><strong>Root:</strong> {entry.root || 'N/A'}</p>
+                  <p><strong>Lemma:</strong> {entry.lemma || 'N/A'}</p>
+                  <p><strong>POS:</strong> {entry.tag || 'N/A'}</p>
                   <p className="location" onClick={() => handleVerseClick(entry.sura, entry.verse)}>
                     Sura {entry.sura}:{entry.verse} (word {entry.wordNum})
                   </p>
-                  {entry.segments.prefixes.length > 0 && (
+                  {entry.segments?.prefixes?.length > 0 && (
                     <p>Prefixes: {entry.segments.prefixes.join(' + ')}</p>
                   )}
-                  <p>Stem: {entry.segments.stem}</p>
-                  {entry.segments.suffixes.length > 0 && (
+                  <p>Stem: {entry.segments?.stem || 'N/A'}</p>
+                  {entry.segments?.suffixes?.length > 0 && (
                     <p>Suffixes: {entry.segments.suffixes.join(' + ')}</p>
                   )}
                 </div>
