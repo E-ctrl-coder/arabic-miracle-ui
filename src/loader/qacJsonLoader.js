@@ -10,6 +10,7 @@ const QAC_PATHS = [
 
 // Cache for loaded data
 let cachedData = null;
+let quranTextCache = null;
 
 /**
  * Normalizes Arabic text by:
@@ -112,6 +113,40 @@ export const loadQACData = async () => {
 };
 
 /**
+ * Loads and caches Quran text from quraan.txt
+ */
+export const loadQuranText = async () => {
+  if (quranTextCache) return quranTextCache;
+  
+  try {
+    const response = await fetch('/quraan.txt');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    
+    quranTextCache = text.trim().split('\n').reduce((acc, line) => {
+      const [sura, verse, text] = line.split('|');
+      if (sura && verse) {
+        acc[`${sura}:${verse}`] = text;
+      }
+      return acc;
+    }, {});
+    
+    return quranTextCache;
+  } catch (error) {
+    console.error("Failed to load Quran text:", error);
+    return {};
+  }
+};
+
+/**
+ * Gets verse text by sura and verse number
+ */
+export const getVerseText = (sura, verse) => {
+  if (!quranTextCache) return "Loading verse...";
+  return quranTextCache[`${sura}:${verse}`] || "Verse not found";
+};
+
+/**
  * Analyzes a single entry to extract:
  * - Morphological features
  * - Location details
@@ -146,42 +181,14 @@ export const getVerseLocation = (entry) => {
   const [sura, verse, wordNum] = entry.location.split(':');
   return { sura, verse, wordNum };
 };
-// Add this new function to src/loader/qacJsonLoader.js
 
-let quranVerses = null;
-
-export async function loadQuranText() {
-  if (quranVerses) return quranVerses;
-  
-  try {
-    const response = await fetch('/quraan.txt');
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const text = await response.text();
-    
-    quranVerses = text.trim().split('\n').map(line => {
-      const [sura, verse, text] = line.split('|');
-      return { sura, verse, text };
-    });
-    
-    return quranVerses;
-  } catch (error) {
-    console.error("Failed to load Quran text:", error);
-    return [];
-  }
-}
-
-export function findVerse(sura, verse) {
-  if (!quranVerses) return null;
-  return quranVerses.find(v => v.sura === sura && v.verse === verse)?.text || "Verse not found";
-}
-
-// Export all functions as named exports
+// Export all functions
 export default {
   normalizeArabic,
   stemArabic,
   loadQACData,
   analyzeEntry,
-  getVerseLocation
-  loadQuranText,  
-  getVerseText 
+  getVerseLocation,
+  loadQuranText,
+  getVerseText
 };
