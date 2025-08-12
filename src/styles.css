@@ -299,4 +299,31 @@ body {
     border: 1px solid #ddd;
     margin-bottom: 1rem;
   }
+  /* Add these new styles at the bottom of your existing CSS */
+
+.location {
+  cursor: pointer;
+  color: #3498db;
+  text-decoration: underline;
+}
+
+.location:hover {
+  color: #2980b9;
+}
+
+.verse-display {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #3498db;
+}
+
+.verse-text {
+  font-size: 1.5rem;
+  line-height: 2.5rem;
+  font-family: 'Traditional Arabic', Arial, sans-serif;
+  text-align: right;
+  margin-top: 1rem;
+}
 }
