@@ -155,3 +155,31 @@ export default {
   analyzeEntry,
   getVerseLocation
 };
+// Add this new function to src/loader/qacJsonLoader.js
+
+let quranVerses = null;
+
+export async function loadQuranText() {
+  if (quranVerses) return quranVerses;
+  
+  try {
+    const response = await fetch('/quraan.txt');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    
+    quranVerses = text.trim().split('\n').map(line => {
+      const [sura, verse, text] = line.split('|');
+      return { sura, verse, text };
+    });
+    
+    return quranVerses;
+  } catch (error) {
+    console.error("Failed to load Quran text:", error);
+    return [];
+  }
+}
+
+export function findVerse(sura, verse) {
+  if (!quranVerses) return null;
+  return quranVerses.find(v => v.sura === sura && v.verse === verse)?.text || "Verse not found";
+}
