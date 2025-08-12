@@ -146,15 +146,6 @@ export const getVerseLocation = (entry) => {
   const [sura, verse, wordNum] = entry.location.split(':');
   return { sura, verse, wordNum };
 };
-
-// Export all functions as named exports
-export default {
-  normalizeArabic,
-  stemArabic,
-  loadQACData,
-  analyzeEntry,
-  getVerseLocation
-};
 // Add this new function to src/loader/qacJsonLoader.js
 
 let quranVerses = null;
@@ -183,3 +174,14 @@ export function findVerse(sura, verse) {
   if (!quranVerses) return null;
   return quranVerses.find(v => v.sura === sura && v.verse === verse)?.text || "Verse not found";
 }
+
+// Export all functions as named exports
+export default {
+  normalizeArabic,
+  stemArabic,
+  loadQACData,
+  analyzeEntry,
+  getVerseLocation
+  loadQuranText,  
+  getVerseText 
+};
