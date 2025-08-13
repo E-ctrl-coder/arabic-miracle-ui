@@ -28,80 +28,50 @@ export default function App() {
     initialize();
   }, []);
 
-  const handleSearch = () => {
-    if (!searchTerm.trim()) {
-      setResults([]);
-      return;
-    }
+ const handleSearch = () => {
+  if (!searchTerm.trim()) {
+    setResults([]);
+    return;
+  }
 
-    const normalized = normalizeArabic(searchTerm);
-    if (!normalized) {
-      setResults([]);
-      return;
-    }
+  const normalized = normalizeArabic(searchTerm);
+  if (!normalized) {
+    setResults([]);
+    return;
+  }
 
-    // Find the root & stem for the input itself
+  // Try to find an exact match for the normalized form
+  let matchedToken = qacData.find(e => e.normalizedForm === normalized);
+
+  // If no exact match, try stem match
+  if (!matchedToken) {
     const inputStem = stemArabic(normalized);
-    let inputRoot = null;
+    matchedToken = qacData.find(e => e.stem === inputStem);
+  }
 
-    // Try exact normalized match to get a root
-    const sampleEntry = qacData.find(e => e.normalizedForm === normalized);
-    if (sampleEntry && sampleEntry.root) {
-      inputRoot = sampleEntry.root;
+  // If still nothing, bail out
+  if (!matchedToken) {
+    setResults([]);
+    return;
+  }
+
+  // Use the loader helper to get all stem‑family occurrences
+  const occurrences = findStemFamilyOccurrences(matchedToken, qacData);
+
+  // Deduplicate results (form + location)
+  const uniqueResults = [];
+  const seen = new Set();
+  occurrences.forEach(entry => {
+    const key = `${entry.form}-${entry.location}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueResults.push(entry);
     }
+  });
 
-    const uniqueResults = [];
-    const seen = new Set();
-
-    // 1) Exact form matches
-    const exactMatches = qacData.filter(entry =>
-      entry.normalizedForm === normalized
-    );
-    exactMatches.forEach(entry => {
-      const key = `${entry.form}-${entry.location}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueResults.push(entry);
-      }
-    });
-
-    // 2) Same stem matches (captures تغيض, يغِيض, نغِيض, etc. after improved stemmer)
-    let stemMatches = [];
-    if (inputStem && inputStem.length > 2) {
-      stemMatches = qacData.filter(entry => entry.stem === inputStem);
-      stemMatches.forEach(entry => {
-        const key = `${entry.form}-${entry.location}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueResults.push(entry);
-        }
-      });
-    }
-
-    // 3) If root is still unknown, infer from stem matches (majority vote)
-    if (!inputRoot && stemMatches.length > 0) {
-      const counts = {};
-      for (const e of stemMatches) {
-        if (!e.root) continue;
-        counts[e.root] = (counts[e.root] || 0) + 1;
-      }
-      inputRoot = Object.keys(counts).sort((a, b) => (counts[b] - counts[a]))[0] || null;
-    }
-
-    // 4) Same root matches (broad family expansion)
-    if (inputRoot) {
-      const rootMatches = qacData.filter(entry => entry.root === inputRoot);
-      rootMatches.forEach(entry => {
-        const key = `${entry.form}-${entry.location}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueResults.push(entry);
-        }
-      });
-    }
-
-    setResults(uniqueResults.slice(0, 100));
-  };
+  // Limit to 100 results for performance
+  setResults(uniqueResults.slice(0, 100));
+};
 
   const handleVerseClick = (sura, verse) => {
     setSelectedVerse({
