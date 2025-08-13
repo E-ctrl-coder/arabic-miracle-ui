@@ -234,4 +234,10 @@ export default {
   loadQuranText,
   getVerseText,
   findStemFamilyOccurrences
+  export function findStemFamilyOccurrences(matchedToken, qacData) {
+  if (!matchedToken || !matchedToken.segments?.stem) return [];
+
+  const targetStem = matchedToken.segments.stem;
+  return qacData.filter(e => e.segments?.stem === targetStem);
+}
 };
