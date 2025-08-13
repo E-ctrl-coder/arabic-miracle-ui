@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { loadQACData, normalizeArabic, stemArabic, loadQuranText, getVerseText } from './loader/qacJsonLoader';
+import { loadQacData, findStemFamilyOccurrences } from './qacJsonLoader.js';
 import './styles.css';
 
 export default function App() {
