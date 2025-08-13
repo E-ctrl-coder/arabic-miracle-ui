@@ -29,70 +29,79 @@ export default function App() {
   }, []);
 
   const handleSearch = () => {
-  if (!searchTerm.trim()) {
-    setResults([]);
-    return;
-  }
-
-  const normalized = normalizeArabic(searchTerm);
-  if (!normalized) {
-    setResults([]);
-    return;
-  }
-
-  // Find the root & stem for the input itself (from first matching entry or via stemmer)
-  let inputStem = stemArabic(normalized);
-  let inputRoot = null;
-  const sampleEntry = qacData.find(e => e.normalizedForm === normalized);
-  if (sampleEntry && sampleEntry.root) {
-    inputRoot = sampleEntry.root;
-  }
-
-  const uniqueResults = [];
-  const seen = new Set();
-
-  // 1️⃣ Exact form matches
-  const exactMatches = qacData.filter(entry =>
-    entry.normalizedForm === normalized
-  );
-  exactMatches.forEach(entry => {
-    const key = `${entry.form}-${entry.location}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueResults.push(entry);
+    if (!searchTerm.trim()) {
+      setResults([]);
+      return;
     }
-  });
 
-  // 2️⃣ Same stem matches
-  if (inputStem && inputStem.length > 2) {
-    const stemMatches = qacData.filter(entry =>
-      entry.stem === inputStem
+    const normalized = normalizeArabic(searchTerm);
+    if (!normalized) {
+      setResults([]);
+      return;
+    }
+
+    // Find the root & stem for the input itself
+    const inputStem = stemArabic(normalized);
+    let inputRoot = null;
+
+    // Try exact normalized match to get a root
+    const sampleEntry = qacData.find(e => e.normalizedForm === normalized);
+    if (sampleEntry && sampleEntry.root) {
+      inputRoot = sampleEntry.root;
+    }
+
+    const uniqueResults = [];
+    const seen = new Set();
+
+    // 1) Exact form matches
+    const exactMatches = qacData.filter(entry =>
+      entry.normalizedForm === normalized
     );
-    stemMatches.forEach(entry => {
+    exactMatches.forEach(entry => {
       const key = `${entry.form}-${entry.location}`;
       if (!seen.has(key)) {
         seen.add(key);
         uniqueResults.push(entry);
       }
     });
-  }
 
-  // 3️⃣ Same root matches (only if we have the root from dataset)
-  if (inputRoot) {
-    const rootMatches = qacData.filter(entry =>
-      entry.root === inputRoot
-    );
-    rootMatches.forEach(entry => {
-      const key = `${entry.form}-${entry.location}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueResults.push(entry);
+    // 2) Same stem matches (captures تغيض, يغِيض, نغِيض, etc. after improved stemmer)
+    let stemMatches = [];
+    if (inputStem && inputStem.length > 2) {
+      stemMatches = qacData.filter(entry => entry.stem === inputStem);
+      stemMatches.forEach(entry => {
+        const key = `${entry.form}-${entry.location}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueResults.push(entry);
+        }
+      });
+    }
+
+    // 3) If root is still unknown, infer from stem matches (majority vote)
+    if (!inputRoot && stemMatches.length > 0) {
+      const counts = {};
+      for (const e of stemMatches) {
+        if (!e.root) continue;
+        counts[e.root] = (counts[e.root] || 0) + 1;
       }
-    });
-  }
+      inputRoot = Object.keys(counts).sort((a, b) => (counts[b] - counts[a]))[0] || null;
+    }
 
-  setResults(uniqueResults.slice(0, 100));
-};
+    // 4) Same root matches (broad family expansion)
+    if (inputRoot) {
+      const rootMatches = qacData.filter(entry => entry.root === inputRoot);
+      rootMatches.forEach(entry => {
+        const key = `${entry.form}-${entry.location}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueResults.push(entry);
+        }
+      });
+    }
+
+    setResults(uniqueResults.slice(0, 100));
+  };
 
   const handleVerseClick = (sura, verse) => {
     setSelectedVerse({
@@ -137,11 +146,11 @@ export default function App() {
                   <p className="location" onClick={() => handleVerseClick(entry.sura, entry.verse)}>
                     Sura {entry.sura}:{entry.verse} (word {entry.wordNum})
                   </p>
-                  {entry.segments.prefixes.length > 0 && (
+                  {entry.segments?.prefixes?.length > 0 && (
                     <p>Prefixes: {entry.segments.prefixes.join(' + ')}</p>
                   )}
-                  <p>Stem: {entry.segments.stem}</p>
-                  {entry.segments.suffixes.length > 0 && (
+                  <p>Stem: {entry.segments?.stem || ''}</p>
+                  {entry.segments?.suffixes?.length > 0 && (
                     <p>Suffixes: {entry.segments.suffixes.join(' + ')}</p>
                   )}
                 </div>
