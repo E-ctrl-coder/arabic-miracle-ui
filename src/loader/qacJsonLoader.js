@@ -193,7 +193,31 @@ export const getVerseLocation = (entry) => {
   const [sura, verse, wordNum] = entry.location.split(':');
   return { sura, verse, wordNum };
 };
+/**
+ * Finds all occurrences for a token based on its in-context stem family.
+ * Layer 1 (root) is shown separately in the UI; root is NOT used here.
+ * This returns every entry whose segments.stem matches or is a morphological
+ * derivative of the given token's stem.
+ */
+export const findStemFamilyOccurrences = (token, allData) => {
+  if (!token?.segments?.stem) return [];
 
+  const anchorStem = token.segments.stem;
+
+  return allData.filter(entry =>
+    entry.segments?.stem === anchorStem ||
+    isMorphDerivative(entry.segments?.stem, anchorStem)
+  );
+};
+
+/**
+ * Basic derivative check — adjust as needed for your definition of "derivative".
+ */
+const isMorphDerivative = (candidateStem, anchorStem) => {
+  if (!candidateStem || !anchorStem) return false;
+  // Example: match if the candidate contains the anchor or vice versa
+  return candidateStem.includes(anchorStem) || anchorStem.includes(candidateStem);
+};
 // Export all functions
 export default {
   normalizeArabic,
@@ -202,5 +226,6 @@ export default {
   analyzeEntry,
   getVerseLocation,
   loadQuranText,
-  getVerseText
+  getVerseText,
+  findStemFamilyOccurrences
 };
