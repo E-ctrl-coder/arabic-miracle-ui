@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { loadQacData, findStemFamilyOccurrences } from './loader/qacJsonLoader.js';
+import {
+  loadQACData,
+  normalizeArabic,
+  stemArabic,
+  findStemFamilyOccurrences
+} from './loader/qacJsonLoader';
 import './styles.css';
 
 export default function App() {
@@ -11,67 +16,102 @@ export default function App() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const initialize = async () => {
+    async function initialize() {
       try {
-        // Load both datasets in parallel
-        const [data, _] = await Promise.all([
-          loadQACData(),
-          loadQuranText()
-        ]);
-        setQacData(data);
+        const data = await loadQACData();
+        setQacData(data || []);
       } catch (err) {
-        setError(`Data loading failed: ${err.message}`);
+        setError(`Data loading failed: ${err?.message || String(err)}`);
       } finally {
         setLoading(false);
       }
-    };
+    }
     initialize();
   }, []);
 
- const handleSearch = () => {
-  if (!searchTerm.trim()) {
-    setResults([]);
-    return;
-  }
-
-  const normalized = normalizeArabic(searchTerm);
-  if (!normalized) {
-    setResults([]);
-    return;
-  }
-
-  // Try to find an exact match for the normalized form
-  let matchedToken = qacData.find(e => e.normalizedForm === normalized);
-
-  // If no exact match, try stem match
-  if (!matchedToken) {
-    const inputStem = stemArabic(normalized);
-    matchedToken = qacData.find(e => e.stem === inputStem);
-  }
-
-  // If still nothing, bail out
-  if (!matchedToken) {
-    setResults([]);
-    return;
-  }
-
-  // Use the loader helper to get all stem‑family occurrences
-  const occurrences = findStemFamilyOccurrences(matchedToken, qacData);
-
-  // Deduplicate results (form + location)
-  const uniqueResults = [];
-  const seen = new Set();
-  occurrences.forEach(entry => {
-    const key = `${entry.form}-${entry.location}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueResults.push(entry);
+  const handleSearch = () => {
+    const raw = searchTerm.trim();
+    if (!raw) {
+      setResults([]);
+      return;
     }
-  });
 
-  // Limit to 100 results for performance
-  setResults(uniqueResults.slice(0, 100));
-};
+    const term = normalizeArabic(raw);
+    if (!term) {
+      setResults([]);
+      return;
+    }
+
+    // 1) Try exact form match
+    let matchedToken = null;
+    outer: for (const verseEntry of qacData) {
+      const tokens = verseEntry?.tokens || [];
+      for (const token of tokens) {
+        const form = token?.form ?? token?.word ?? '';
+        if (form && normalizeArabic(form) === term) {
+          matchedToken = token;
+          break outer;
+        }
+      }
+    }
+
+    // 2) If not found, try stem match
+    if (!matchedToken) {
+      const inputStem = stemArabic(term);
+      outerStem: for (const verseEntry of qacData) {
+        const tokens = verseEntry?.tokens || [];
+        for (const token of tokens) {
+          const tokenStem =
+            token?.segments?.stem ??
+            token?.stem ??
+            null;
+          if (tokenStem && tokenStem === inputStem) {
+            matchedToken = token;
+            break outerStem;
+          }
+        }
+      }
+    }
+
+    if (!matchedToken) {
+      setResults([]);
+      return;
+    }
+
+    // 3) Gather all occurrences in the same stem family
+    const occurrences = findStemFamilyOccurrences(matchedToken, qacData) || [];
+
+    // 4) Deduplicate by form + location (if provided)
+    const unique = [];
+    const seen = new Set();
+    for (const entry of occurrences) {
+      const key = `${entry.form}-${entry.location}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(entry);
+      }
+    }
+
+    // 5) Limit for performance
+    setResults(unique.slice(0, 100));
+  };
+
+  const getVerseText = (sura, verse) => {
+    // Try to locate a verse record that carries text alongside tokens
+    const v =
+      qacData.find(
+        (e) =>
+          (e.sura === sura || e.surah === sura) &&
+          (e.verse === verse || e.ayah === verse)
+      ) || null;
+
+    return (
+      v?.verse ||
+      v?.text ||
+      v?.ayahText ||
+      ''
+    );
+  };
 
   const handleVerseClick = (sura, verse) => {
     setSelectedVerse({
@@ -84,7 +124,7 @@ export default function App() {
   return (
     <div className="app">
       <h1>Quranic Arabic Corpus Analyzer</h1>
-      
+
       <div className="search-box">
         <input
           type="text"
@@ -113,7 +153,10 @@ export default function App() {
                   <p><strong>Root:</strong> {entry.root}</p>
                   <p><strong>Lemma:</strong> {entry.lemma}</p>
                   <p><strong>POS:</strong> {entry.tag}</p>
-                  <p className="location" onClick={() => handleVerseClick(entry.sura, entry.verse)}>
+                  <p
+                    className="location"
+                    onClick={() => handleVerseClick(entry.sura, entry.verse)}
+                  >
                     Sura {entry.sura}:{entry.verse} (word {entry.wordNum})
                   </p>
                   {entry.segments?.prefixes?.length > 0 && (
