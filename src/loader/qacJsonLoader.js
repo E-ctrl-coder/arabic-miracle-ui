@@ -111,7 +111,51 @@ export const loadQACData = async () => {
   
   throw new Error(`All data loading attempts failed. Last error: ${lastError?.message}`);
 };
+// Add these new functions to your existing qacJsonLoader.js
+// (Keep all existing functions, just add these)
 
+/**
+ * Enhanced root detection using qac.json's known roots
+ */
+export const findRootForWord = (word, qacData) => {
+  const normalized = normalizeArabic(word);
+  
+  // First try to find exact match in qac.json
+  const exactMatch = qacData.find(entry => 
+    normalizeArabic(entry.form) === normalized
+  );
+  if (exactMatch) return exactMatch.root;
+
+  // Fallback to stem-based root matching
+  const stemmed = stemArabic(word);
+  const similarStem = qacData.find(entry => 
+    stemArabic(entry.form) === stemmed
+  );
+  
+  return similarStem?.root || stemmed.slice(0, 3); // Default to first 3 letters
+};
+
+/**
+ * Detect word pattern based on prefixes/suffixes
+ */
+export const detectPattern = (word) => {
+  const stem = stemArabic(word);
+  const normalized = normalizeArabic(word);
+
+  if (normalized.startsWith('ي') && stem.length === 3) return 'يَفْعُلُ';
+  if (normalized.startsWith('ت')) return 'تَفْعِيل';
+  if (normalized.endsWith('ة')) return 'فِعْلَة';
+  return 'فَعَلَ';
+};
+
+/**
+ * Classify word type
+ */
+export const classifyWord = (word) => {
+  if (word.includes('ال')) return 'اسم';
+  if (/[يتبن]$/.test(normalizeArabic(word))) return 'فعل';
+  return 'حرف';
+};
 /**
  * Loads and caches Quran text from quraan.txt
  */
