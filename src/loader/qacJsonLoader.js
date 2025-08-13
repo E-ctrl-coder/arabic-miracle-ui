@@ -3,7 +3,7 @@
 // Configuration constants
 const QAC_PATHS = [
   '/qac.json',
-  './qac.json', 
+  './qac.json',
   '/public/qac.json',
   'qac.json'
 ];
@@ -25,11 +25,11 @@ export const normalizeArabic = (text) => {
     .normalize('NFKD')
     // Remove diacritics and tatweel
     .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
-    // Normalize Alef variants
+    // Normalize Alef variants and hamza-on-carriers
     .replace(/[إأآءؤئ]/g, 'ا')
     // Normalize other characters
-    .replace(/[ة]/g, 'ه')
-    .replace(/[ى]/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
     // Remove non-Arabic characters
     .replace(/[^\u0600-\u06FF]/g, '')
     .trim();
@@ -37,32 +37,44 @@ export const normalizeArabic = (text) => {
 
 /**
  * Conservative Arabic stemmer that:
- * - Removes common prefixes
+ * - Iteratively removes frequent proclitics and imperfect prefixes
  * - Removes common suffixes
- * - Preserves word core
+ * - Preserves the core as much as possible
  */
 export const stemArabic = (word) => {
   const normalized = normalizeArabic(word);
   if (normalized.length < 3) return normalized;
-  
-  // Common Arabic prefixes
-  const prefixes = [/^ال/, /^وال/, /^فال/, /^بال/, /^كال/, /^ل/, /^ب/, /^ك/, /^س/, /^ف/, /^و/];
-  
-  // Common Arabic suffixes
-  const suffixes = [/ه$/, /ها$/, /هم$/, /هن$/, /كما$/, /كم$/, /نا$/, /ي$/, /ك$/, /وا$/, /ات$/, /ون$/, /ين$/, /ان$/];
-  
+
   let stemmed = normalized;
-  
-  // Remove prefixes
-  prefixes.forEach(pattern => {
-    stemmed = stemmed.replace(pattern, '');
-  });
-  
-  // Remove suffixes
-  suffixes.forEach(pattern => {
-    stemmed = stemmed.replace(pattern, '');
-  });
-  
+
+  // Iteratively strip common leading clitics and imperfect prefixes
+  const prefixPatterns = [
+    /^(وال|فال|بال|كال)/, // fused clitics + "ال"
+    /^ال/,                // definite article
+    /^(و|ف|س)/,           // conjunctions/future
+    /^(ل|ب|ك)/,           // proclitics
+    /^(ي|ت|ن|أ)/          // imperfect verb prefixes (ya-, ta-, na-, ’a-)
+  ];
+
+  let prev;
+  do {
+    prev = stemmed;
+    for (const p of prefixPatterns) {
+      stemmed = stemmed.replace(p, '');
+    }
+  } while (stemmed !== prev && stemmed.length > 2);
+
+  // Common Arabic suffixes
+  const suffixes = [
+    /كما$/, /كم$/, /كن$/, /نا$/, /ني$/, /نا$/, /هم$/, /هن$/, /ها$/, /ه$/, /ك$/,
+    /وا$/, /ات$/, /ون$/, /ين$/, /ان$/
+  ];
+
+  for (const s of suffixes) {
+    const next = stemmed.replace(s, '');
+    if (next.length >= 2) stemmed = next;
+  }
+
   return stemmed.length > 1 ? stemmed : normalized;
 };
 
@@ -124,9 +136,9 @@ export const loadQuranText = async () => {
     const text = await response.text();
     
     quranTextCache = text.trim().split('\n').reduce((acc, line) => {
-      const [sura, verse, text] = line.split('|');
+      const [sura, verse, t] = line.split('|');
       if (sura && verse) {
-        acc[`${sura}:${verse}`] = text;
+        acc[`${sura}:${verse}`] = t;
       }
       return acc;
     }, {});
