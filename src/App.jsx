@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { loadQacData, findStemFamilyOccurrences } from './qacJsonLoader.js';
+import { loadQacData, findStemFamilyOccurrences } from './loader/qacJsonLoader.js';
 import './styles.css';
 
 export default function App() {
