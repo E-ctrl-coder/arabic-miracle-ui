@@ -204,16 +204,7 @@ export const getVerseLocation = (entry) => {
  * This returns every entry whose segments.stem matches or is a morphological
  * derivative of the given token's stem.
  */
-export const findStemFamilyOccurrences = (token, allData) => {
-  if (!token?.segments?.stem) return [];
 
-  const anchorStem = token.segments.stem;
-
-  return allData.filter(entry =>
-    entry.segments?.stem === anchorStem ||
-    isMorphDerivative(entry.segments?.stem, anchorStem)
-  );
-};
 
 /**
  * Basic derivative check — adjust as needed for your definition of "derivative".
