@@ -20,7 +20,7 @@ let quranTextCache = null;
  */
 export const normalizeArabic = (text) => {
   if (!text) return '';
-  
+
   return text
     .normalize('NFKD')
     // Remove diacritics and tatweel
@@ -86,41 +86,45 @@ export const stemArabic = (word) => {
  */
 export const loadQACData = async () => {
   if (cachedData) return cachedData;
-  
+
   let lastError = null;
-  
+
   for (const path of QAC_PATHS) {
     try {
       const response = await fetch(path);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       // Validate data structure
       if (!Array.isArray(data)) throw new Error("Data is not an array");
       if (data.length === 0) throw new Error("Empty dataset");
       if (!data[0].location || !data[0].form) throw new Error("Missing required fields");
-      
-      // Pre-process data
+
+      // Pre-process data with consistent `segments.stem`
       cachedData = data.map(entry => ({
         ...entry,
         normalizedForm: normalizeArabic(entry.form),
         stem: stemArabic(entry.form),
+        segments: {
+          ...(entry.segments || {}),
+          stem: stemArabic(entry.form)
+        },
         sura: entry.location.split(':')[0],
         verse: entry.location.split(':')[1],
         wordNum: entry.location.split(':')[2]
       }));
-      
+
       return cachedData;
     } catch (error) {
       lastError = error;
       console.warn(`Failed to load from ${path}:`, error.message);
     }
   }
-  
+
   throw new Error(`All data loading attempts failed. Last error: ${lastError?.message}`);
 };
 
@@ -129,12 +133,12 @@ export const loadQACData = async () => {
  */
 export const loadQuranText = async () => {
   if (quranTextCache) return quranTextCache;
-  
+
   try {
     const response = await fetch('/quraan.txt');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const text = await response.text();
-    
+
     quranTextCache = text.trim().split('\n').reduce((acc, line) => {
       const [sura, verse, t] = line.split('|');
       if (sura && verse) {
@@ -142,7 +146,7 @@ export const loadQuranText = async () => {
       }
       return acc;
     }, {});
-    
+
     return quranTextCache;
   } catch (error) {
     console.error("Failed to load Quran text:", error);
@@ -166,7 +170,7 @@ export const getVerseText = (sura, verse) => {
  */
 export const analyzeEntry = (entry) => {
   if (!entry) return null;
-  
+
   return {
     form: entry.form,
     normalized: entry.normalizedForm || normalizeArabic(entry.form),
@@ -189,10 +193,11 @@ export const analyzeEntry = (entry) => {
  */
 export const getVerseLocation = (entry) => {
   if (!entry?.location) return { sura: "0", verse: "0", wordNum: "0" };
-  
+
   const [sura, verse, wordNum] = entry.location.split(':');
   return { sura, verse, wordNum };
 };
+
 /**
  * Finds all occurrences for a token based on its in-context stem family.
  * Layer 1 (root) is shown separately in the UI; root is NOT used here.
@@ -218,6 +223,7 @@ const isMorphDerivative = (candidateStem, anchorStem) => {
   // Example: match if the candidate contains the anchor or vice versa
   return candidateStem.includes(anchorStem) || anchorStem.includes(candidateStem);
 };
+
 // Export all functions
 export default {
   normalizeArabic,
