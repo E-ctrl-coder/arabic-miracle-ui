@@ -42,7 +42,6 @@ export default function App() {
       return;
     }
 
-    // 1) Try exact form match
     let matchedToken = null;
     outer: for (const verseEntry of qacData) {
       const tokens = verseEntry?.tokens || [];
@@ -55,16 +54,12 @@ export default function App() {
       }
     }
 
-    // 2) If not found, try stem match
     if (!matchedToken) {
       const inputStem = stemArabic(term);
       outerStem: for (const verseEntry of qacData) {
         const tokens = verseEntry?.tokens || [];
         for (const token of tokens) {
-          const tokenStem =
-            token?.segments?.stem ??
-            token?.stem ??
-            null;
+          const tokenStem = token?.segments?.stem ?? token?.stem ?? null;
           if (tokenStem && tokenStem === inputStem) {
             matchedToken = token;
             break outerStem;
@@ -78,10 +73,8 @@ export default function App() {
       return;
     }
 
-    // 3) Gather all occurrences in the same stem family
     const occurrences = findStemFamilyOccurrences(matchedToken, qacData) || [];
 
-    // 4) Deduplicate by form + location (if provided)
     const unique = [];
     const seen = new Set();
     for (const entry of occurrences) {
@@ -92,12 +85,10 @@ export default function App() {
       }
     }
 
-    // 5) Limit for performance
     setResults(unique.slice(0, 100));
   };
 
   const getVerseText = (sura, verse) => {
-    // Try to locate a verse record that carries text alongside tokens
     const v =
       qacData.find(
         (e) =>
@@ -105,12 +96,7 @@ export default function App() {
           (e.verse === verse || e.ayah === verse)
       ) || null;
 
-    return (
-      v?.verse ||
-      v?.text ||
-      v?.ayahText ||
-      ''
-    );
+    return v?.verse || v?.text || v?.ayahText || '';
   };
 
   const handleVerseClick = (sura, verse) => {
@@ -187,4 +173,28 @@ export default function App() {
       )}
     </div>
   );
+}
+
+// 🔹 CLOSE the export list cleanly — no trailing comma before a function export
+export { getVerseText };
+
+// 🔹 Now declare the function cleanly at top level
+export function findStemFamilyOccurrences(matchedToken, qacData) {
+  if (!matchedToken || !matchedToken.segments?.stem) return [];
+
+  const stem = matchedToken.segments.stem;
+  const occurrences = [];
+
+  qacData.forEach((entry, verseIndex) => {
+    entry.tokens.forEach((token) => {
+      if (token.segments?.stem === stem) {
+        occurrences.push({
+          verseIndex,
+          token
+        });
+      }
+    });
+  });
+
+  return occurrences;
 }
