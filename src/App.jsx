@@ -176,7 +176,6 @@ export default function App() {
 }
 
 // 🔹 CLOSE the export list cleanly — no trailing comma before a function export
-export { getVerseText };
 
 // 🔹 Now declare the function cleanly at top level
 export function findStemFamilyOccurrences(matchedToken, qacData) {
