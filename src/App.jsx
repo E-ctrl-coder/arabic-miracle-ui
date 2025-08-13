@@ -29,44 +29,70 @@ export default function App() {
   }, []);
 
   const handleSearch = () => {
-    if (!searchTerm.trim()) {
-      setResults([]);
-      return;
-    }
+  if (!searchTerm.trim()) {
+    setResults([]);
+    return;
+  }
 
-    const normalized = normalizeArabic(searchTerm);
-    if (!normalized) {
-      setResults([]);
-      return;
-    }
+  const normalized = normalizeArabic(searchTerm);
+  if (!normalized) {
+    setResults([]);
+    return;
+  }
 
-    // Exact match search
-    let matches = qacData.filter(entry => 
-      entry.normalizedForm === normalized
+  // Find the root & stem for the input itself (from first matching entry or via stemmer)
+  let inputStem = stemArabic(normalized);
+  let inputRoot = null;
+  const sampleEntry = qacData.find(e => e.normalizedForm === normalized);
+  if (sampleEntry && sampleEntry.root) {
+    inputRoot = sampleEntry.root;
+  }
+
+  const uniqueResults = [];
+  const seen = new Set();
+
+  // 1️⃣ Exact form matches
+  const exactMatches = qacData.filter(entry =>
+    entry.normalizedForm === normalized
+  );
+  exactMatches.forEach(entry => {
+    const key = `${entry.form}-${entry.location}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueResults.push(entry);
+    }
+  });
+
+  // 2️⃣ Same stem matches
+  if (inputStem && inputStem.length > 2) {
+    const stemMatches = qacData.filter(entry =>
+      entry.stem === inputStem
     );
-
-    // Stem match fallback
-    if (matches.length === 0) {
-      const stem = stemArabic(normalized);
-      matches = qacData.filter(entry => 
-        entry.stem === stem && stem.length > 2
-      );
-    }
-
-    // Remove duplicates
-    const uniqueResults = [];
-    const seen = new Set();
-    
-    matches.forEach(entry => {
+    stemMatches.forEach(entry => {
       const key = `${entry.form}-${entry.location}`;
       if (!seen.has(key)) {
         seen.add(key);
         uniqueResults.push(entry);
       }
     });
+  }
 
-    setResults(uniqueResults.slice(0, 100));
-  };
+  // 3️⃣ Same root matches (only if we have the root from dataset)
+  if (inputRoot) {
+    const rootMatches = qacData.filter(entry =>
+      entry.root === inputRoot
+    );
+    rootMatches.forEach(entry => {
+      const key = `${entry.form}-${entry.location}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueResults.push(entry);
+      }
+    });
+  }
+
+  setResults(uniqueResults.slice(0, 100));
+};
 
   const handleVerseClick = (sura, verse) => {
     setSelectedVerse({
