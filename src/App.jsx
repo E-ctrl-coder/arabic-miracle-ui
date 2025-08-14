@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   loadQACData,
+  loadQuranText,
+  getVerseText as getVerseTextFromLoader,
   normalizeArabic,
   stemArabic,
   findStemFamilyOccurrences
@@ -15,11 +17,15 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Initialize: load corpus (qac.json) and verse text (quraan.txt)
   useEffect(() => {
     async function initialize() {
       try {
-        const data = await loadQACData();
-        setQacData(data || []);
+        const [data] = await Promise.all([
+          loadQACData(),
+          loadQuranText()
+        ]);
+        setQacData(Array.isArray(data) ? data : []);
       } catch (err) {
         setError(`Data loading failed: ${err?.message || String(err)}`);
       } finally {
@@ -31,7 +37,7 @@ export default function App() {
 
   const handleSearch = () => {
     const raw = searchTerm.trim();
-    if (!raw) {
+    if (!raw || loading) {
       setResults([]);
       return;
     }
@@ -42,41 +48,33 @@ export default function App() {
       return;
     }
 
-    let matchedToken = null;
-    outer: for (const verseEntry of qacData) {
-      const tokens = verseEntry?.tokens || [];
-      for (const token of tokens) {
-        const form = token?.form ?? token?.word ?? '';
-        if (form && normalizeArabic(form) === term) {
-          matchedToken = token;
-          break outer;
-        }
-      }
-    }
+    // 1) Exact form match on flat entries
+    let matchedEntry =
+      qacData.find(e => {
+        const form = e?.form ?? e?.word ?? '';
+        return form && normalizeArabic(form) === term;
+      }) || null;
 
-    if (!matchedToken) {
+    // 2) Fallback: stem match
+    if (!matchedEntry) {
       const inputStem = stemArabic(term);
-      outerStem: for (const verseEntry of qacData) {
-        const tokens = verseEntry?.tokens || [];
-        for (const token of tokens) {
-          const tokenStem = token?.segments?.stem ?? token?.stem ?? null;
-          if (tokenStem && tokenStem === inputStem) {
-            matchedToken = token;
-            break outerStem;
-          }
-        }
-      }
+      matchedEntry = qacData.find(e => {
+        const tokenStem = e?.segments?.stem ?? e?.stem ?? null;
+        return tokenStem && tokenStem === inputStem;
+      }) || null;
     }
 
-    if (!matchedToken) {
+    if (!matchedEntry) {
       setResults([]);
       return;
     }
 
-    const occurrences = findStemFamilyOccurrences(matchedToken, qacData) || [];
+    // 3) Collect stem-family occurrences across flat dataset
+    const occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
 
-    const unique = [];
+    // 4) Deduplicate by form+location, then lightly sort by sura:verse:word
     const seen = new Set();
+    const unique = [];
     for (const entry of occurrences) {
       const key = `${entry.form}-${entry.location}`;
       if (!seen.has(key)) {
@@ -85,18 +83,21 @@ export default function App() {
       }
     }
 
+    unique.sort((a, b) => {
+      const sa = Number(a.sura), sb = Number(b.sura);
+      if (sa !== sb) return sa - sb;
+      const va = Number(a.verse), vb = Number(b.verse);
+      if (va !== vb) return va - vb;
+      const wa = Number(a.wordNum), wb = Number(b.wordNum);
+      return wa - wb;
+    });
+
     setResults(unique.slice(0, 100));
   };
 
   const getVerseText = (sura, verse) => {
-    const v =
-      qacData.find(
-        (e) =>
-          (e.sura === sura || e.surah === sura) &&
-          (e.verse === verse || e.ayah === verse)
-      ) || null;
-
-    return v?.verse || v?.text || v?.ayahText || '';
+    // Provided by loader after loadQuranText() warmed the cache
+    return getVerseTextFromLoader(String(sura), String(verse)) || '';
   };
 
   const handleVerseClick = (sura, verse) => {
@@ -116,7 +117,7 @@ export default function App() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Enter Arabic word"
           dir="rtl"
           lang="ar"
