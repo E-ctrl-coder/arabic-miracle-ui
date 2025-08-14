@@ -7,6 +7,7 @@ import {
   stemArabic,
   findStemFamilyOccurrences
 } from './loader/qacJsonLoader';
+import buckwalterToArabic from './utils/buckwalterToArabic';
 import './styles.css';
 
 const posMap = {
@@ -152,10 +153,12 @@ export default function App() {
           <div className="results-grid">
             {results.map((entry, idx) => (
               <div key={idx} className="entry-card">
-                <div className="arabic" dir="rtl" lang="ar">{entry.form}</div>
+                <div className="arabic" dir="rtl" lang="ar">
+                  {buckwalterToArabic(entry.form)}
+                </div>
                 <div className="details" dir="rtl" lang="ar">
-                  <p><strong>الجذر:</strong> {entry.root}</p>
-                  <p><strong>اللفظة:</strong> {entry.lemma}</p>
+                  <p><strong>الجذر:</strong> {buckwalterToArabic(entry.root)}</p>
+                  <p><strong>اللفظة:</strong> {buckwalterToArabic(entry.lemma)}</p>
                   <p><strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}</p>
                   <p
                     className="location"
@@ -164,11 +167,11 @@ export default function App() {
                     سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
                   </p>
                   {entry.segments?.prefixes?.length > 0 && (
-                    <p>السوابق: {entry.segments.prefixes.join(' + ')}</p>
+                    <p>السوابق: {entry.segments.prefixes.map(buckwalterToArabic).join(' + ')}</p>
                   )}
-                  <p>الجذر الصرفي: {entry.segments?.stem || ''}</p>
+                  <p>الجذر الصرفي: {buckwalterToArabic(entry.segments?.stem || '')}</p>
                   {entry.segments?.suffixes?.length > 0 && (
-                    <p>اللواحق: {entry.segments.suffixes.join(' + ')}</p>
+                    <p>اللواحق: {entry.segments.suffixes.map(buckwalterToArabic).join(' + ')}</p>
                   )}
                 </div>
               </div>
