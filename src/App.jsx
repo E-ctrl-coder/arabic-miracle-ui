@@ -137,9 +137,9 @@ export default function App() {
               <div key={idx} className="entry-card">
                 <div className="arabic">{entry.form}</div>
                 <div className="details">
-                  <p><strong>Root:</strong> {entry.root}</p>
-                  <p><strong>Lemma:</strong> {entry.lemma}</p>
-                  <p><strong>POS:</strong> {entry.tag}</p>
+                  <p><strong>Root(الجذر):</strong> {entry.root}</p>
+                  <p><strong>Lemma(اللفظة):</strong> {entry.lemma}</p>
+                  <p><strong>POS(نوع الكلمة):</strong> {entry.tag}</p>
                   <p
                     className="location"
                     onClick={() => handleVerseClick(entry.sura, entry.verse)}
@@ -147,11 +147,11 @@ export default function App() {
                     Sura {entry.sura}:{entry.verse} (word {entry.wordNum})
                   </p>
                   {entry.segments?.prefixes?.length > 0 && (
-                    <p>Prefixes: {entry.segments.prefixes.join(' + ')}</p>
+                    <p>Prefixes(السوابق): {entry.segments.prefixes.join(' + ')}</p>
                   )}
                   <p>Stem: {entry.segments?.stem || ''}</p>
                   {entry.segments?.suffixes?.length > 0 && (
-                    <p>Suffixes: {entry.segments.suffixes.join(' + ')}</p>
+                    <p>Suffixes(اللواحق): {entry.segments.suffixes.join(' + ')}</p>
                   )}
                 </div>
               </div>
