@@ -174,26 +174,3 @@ export default function App() {
     </div>
   );
 }
-
-// 🔹 CLOSE the export list cleanly — no trailing comma before a function export
-
-// 🔹 Now declare the function cleanly at top level
-export function findStemFamilyOccurrences(matchedToken, qacData) {
-  if (!matchedToken || !matchedToken.segments?.stem) return [];
-
-  const stem = matchedToken.segments.stem;
-  const occurrences = [];
-
-  qacData.forEach((entry, verseIndex) => {
-    entry.tokens.forEach((token) => {
-      if (token.segments?.stem === stem) {
-        occurrences.push({
-          verseIndex,
-          token
-        });
-      }
-    });
-  });
-
-  return occurrences;
-}
