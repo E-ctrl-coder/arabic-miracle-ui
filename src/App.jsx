@@ -9,6 +9,23 @@ import {
 } from './loader/qacJsonLoader';
 import './styles.css';
 
+const posMap = {
+  V: 'فعل',
+  N: 'اسم',
+  PN: 'اسم علم',
+  ADJ: 'صفة',
+  ADV: 'حال',
+  PRON: 'ضمير',
+  P: 'حرف جر',
+  NUM: 'عدد',
+  CONJ: 'حرف عطف',
+  PART: 'حرف',
+  DET: 'أداة تعريف',
+  PREP: 'حرف جر',
+  INTERJ: 'أداة تعجب',
+  // Extend as needed to cover your dataset
+};
+
 export default function App() {
   const [qacData, setQacData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +44,7 @@ export default function App() {
         ]);
         setQacData(Array.isArray(data) ? data : []);
       } catch (err) {
-        setError(`Data loading failed: ${err?.message || String(err)}`);
+        setError(`فشل تحميل البيانات: ${err?.message || String(err)}`);
       } finally {
         setLoading(false);
       }
@@ -110,7 +127,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <h1>Quranic Arabic Corpus Analyzer</h1>
+      <h1>المحلل الصرفي للقرآن الكريم</h1>
 
       <div className="search-box">
         <input
@@ -118,40 +135,40 @@ export default function App() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Enter Arabic word"
+          placeholder="أدخل كلمة عربية"
           dir="rtl"
           lang="ar"
         />
-        <button onClick={handleSearch}>Search</button>
+        <button onClick={handleSearch}>ابحث</button>
       </div>
 
       {loading ? (
-        <div className="status">Loading corpus data...</div>
+        <div className="status" dir="rtl" lang="ar">جارٍ تحميل بيانات المتن...</div>
       ) : error ? (
-        <div className="error">{error}</div>
+        <div className="error" dir="rtl" lang="ar">{error}</div>
       ) : results.length > 0 ? (
         <div className="results">
-          <h2>Found {results.length} matches</h2>
+          <h2 dir="rtl" lang="ar">تم العثور على {results.length} نتيجة</h2>
           <div className="results-grid">
             {results.map((entry, idx) => (
               <div key={idx} className="entry-card">
-                <div className="arabic">{entry.form}</div>
-                <div className="details">
-                  <p><strong>Root(الجذر):</strong> {entry.root}</p>
-                  <p><strong>Lemma(اللفظة):</strong> {entry.lemma}</p>
-                  <p><strong>POS(نوع الكلمة):</strong> {entry.tag}</p>
+                <div className="arabic" dir="rtl" lang="ar">{entry.form}</div>
+                <div className="details" dir="rtl" lang="ar">
+                  <p><strong>الجذر:</strong> {entry.root}</p>
+                  <p><strong>اللفظة:</strong> {entry.lemma}</p>
+                  <p><strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}</p>
                   <p
                     className="location"
                     onClick={() => handleVerseClick(entry.sura, entry.verse)}
                   >
-                    Sura {entry.sura}:{entry.verse} (word {entry.wordNum})
+                    سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
                   </p>
                   {entry.segments?.prefixes?.length > 0 && (
-                    <p>Prefixes(السوابق): {entry.segments.prefixes.join(' + ')}</p>
+                    <p>السوابق: {entry.segments.prefixes.join(' + ')}</p>
                   )}
-                  <p>Stem: {entry.segments?.stem || ''}</p>
+                  <p>الجذر الصرفي: {entry.segments?.stem || ''}</p>
                   {entry.segments?.suffixes?.length > 0 && (
-                    <p>Suffixes(اللواحق): {entry.segments.suffixes.join(' + ')}</p>
+                    <p>اللواحق: {entry.segments.suffixes.join(' + ')}</p>
                   )}
                 </div>
               </div>
@@ -159,14 +176,14 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <div className="status">
-          {searchTerm ? 'No matches found' : 'Enter a word to search'}
+        <div className="status" dir="rtl" lang="ar">
+          {searchTerm ? 'لم يتم العثور على نتائج' : 'أدخل كلمة للبحث'}
         </div>
       )}
 
       {selectedVerse && (
         <div className="verse-display">
-          <h3>Sura {selectedVerse.sura}, Verse {selectedVerse.verse}</h3>
+          <h3 dir="rtl" lang="ar">سورة {selectedVerse.sura}، آية {selectedVerse.verse}</h3>
           <div className="verse-text" dir="rtl" lang="ar">
             {selectedVerse.text}
           </div>
