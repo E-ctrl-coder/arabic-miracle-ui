@@ -204,7 +204,17 @@ export const getVerseLocation = (entry) => {
  * This returns every entry whose segments.stem matches or is a morphological
  * derivative of the given token's stem.
  */
+export const findStemFamilyOccurrences = (token, allData) => {
+  if (!token || !Array.isArray(allData)) return [];
 
+  const anchorStem = token?.segments?.stem || token?.stem;
+  if (!anchorStem) return [];
+
+  return allData.filter(entry => {
+    const candidateStem = entry?.segments?.stem || entry?.stem;
+    return candidateStem === anchorStem || isMorphDerivative(candidateStem, anchorStem);
+  });
+};
 
 /**
  * Basic derivative check — adjust as needed for your definition of "derivative".
@@ -225,10 +235,4 @@ export default {
   loadQuranText,
   getVerseText,
   findStemFamilyOccurrences
-  export function findStemFamilyOccurrences(matchedToken, qacData) {
-  if (!matchedToken || !matchedToken.segments?.stem) return [];
-
-  const targetStem = matchedToken.segments.stem;
-  return qacData.filter(e => e.segments?.stem === targetStem);
-}
 };
