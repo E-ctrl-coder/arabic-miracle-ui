@@ -104,14 +104,16 @@ export const loadQACData = async () => {
       if (data.length === 0) throw new Error("Empty dataset");
       if (!data[0].location || !data[0].form) throw new Error("Missing required fields");
 
-      // Pre-process data with consistent `segments.stem`
+      // Pre-process data:
+      // - Preserve QAC's own segments.stem exactly as provided (no overriding)
+      // - Add normalizedForm and a derived 'stem' for optional use elsewhere
       cachedData = data.map(entry => ({
         ...entry,
         normalizedForm: normalizeArabic(entry.form),
+        // Keep a derived convenience stem, but DO NOT write it into segments.stem
         stem: stemArabic(entry.form),
         segments: {
-          ...(entry.segments || {}),
-          stem: stemArabic(entry.form)
+          ...(entry.segments || {}) // preserve original segmentation including stem
         },
         sura: entry.location.split(':')[0],
         verse: entry.location.split(':')[1],
@@ -199,21 +201,18 @@ export const getVerseLocation = (entry) => {
 };
 
 /**
- * Finds all occurrences for a token based on its in-context stem family.
- * Layer 1 (root) is shown separately in the UI; root is NOT used here.
- * This returns every entry whose segments.stem matches or is a morphological
- * derivative of the given token's stem.
+ * Finds all occurrences for a token based on its exact QAC morphological stem.
+ * Root is NOT used here. No fallback to derived/stemArabic().
  */
 export const findStemFamilyOccurrences = (token, allData) => {
-  if (!token || !Array.isArray(allData)) return [];
+  if (!token?.segments?.stem || !Array.isArray(allData)) return [];
 
-  const anchorStem = token?.segments?.stem || token?.stem;
-  if (!anchorStem) return [];
+  const anchorStem = token.segments.stem;
 
-  return allData.filter(entry => {
-    const candidateStem = entry?.segments?.stem || entry?.stem;
-    return candidateStem === anchorStem || isMorphDerivative(candidateStem, anchorStem);
-  });
+  // Exact match only: compare QAC's own segments.stem
+  return allData.filter(entry =>
+    entry.segments?.stem === anchorStem
+  );
 };
 
 /**
