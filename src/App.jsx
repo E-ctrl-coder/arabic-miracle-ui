@@ -26,11 +26,39 @@ const posMap = {
   INTERJ: 'أداة تعجب',
 };
 
+// Updated helper: highlights both stem and root anywhere in the verse
+function highlightTokenStemInVerse(verse, entry) {
+  if (!verse || !entry) return verse;
+
+  const strip = s => s?.replace(/[\u064B-\u065F\u0670\u0640]/g, '') || '';
+
+  const stem = strip(entry.segments?.stem || '');
+  const root = strip(entry.root || '');
+
+  if (!stem && !root) return verse;
+
+  const patternParts = [];
+  if (stem) patternParts.push(stem);
+  if (root && root !== stem) patternParts.push(root);
+
+  const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const pattern = new RegExp(
+    '(' +
+      patternParts.map(escapeRegex).join('|') +
+      ')' +
+      '[\u064B-\u065F\u0670\u0640]*', // trailing diacritics allowed
+    'g'
+  );
+
+  return verse.replace(pattern, match => `<span class="hl-stem">${match}</span>`);
+}
+
 export default function App() {
   const [qacData, setQacData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState([]);
-  const [openReference, setOpenReference] = useState(null); // {sura, verse, text}
+  const [openReference, setOpenReference] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -83,11 +111,9 @@ export default function App() {
       return;
     }
 
-    // Existing stem-family matches
     const occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
-
-    // NEW: If verb, expand to all verbs with same root
     let expandedOccurrences = [...occurrences];
+
     if (matchedEntry.tag === 'V' && matchedEntry.root) {
       const sameRootVerbs = qacData.filter(e =>
         e.tag === 'V' && e.root === matchedEntry.root
@@ -159,6 +185,10 @@ export default function App() {
               const isOpen = openReference &&
                              openReference.sura === entry.sura &&
                              openReference.verse === entry.verse;
+              const verseHTML = isOpen
+                ? highlightTokenStemInVerse(openReference.text, entry)
+                : null;
+
               return (
                 <div key={idx} className="entry-card">
                   <div className="arabic" dir="rtl" lang="ar">
@@ -183,11 +213,12 @@ export default function App() {
                       <p>اللواحق: {entry.segments.suffixes.map(buckwalterToArabic).join(' + ')}</p>
                     )}
                     {isOpen && (
-                      <div className="verse-inline" style={{ marginTop: '0.5em' }}>
-                        <div dir="rtl" lang="ar">
-                          {openReference.text}
-                        </div>
-                      </div>
+                      <div
+                        className="verse-inline"
+                        dir="rtl"
+                        lang="ar"
+                        dangerouslySetInnerHTML={{ __html: verseHTML }}
+                      />
                     )}
                   </div>
                 </div>
