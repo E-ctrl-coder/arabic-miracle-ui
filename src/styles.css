@@ -333,19 +333,19 @@ body {
 }
 
 .verse-inline {
-  margin-left: auto;            /* push verse text to the LEFT side */
+  margin-left: auto;            /* keep it to the left side in RTL layout */
   font-family: var(--arabic-font);
   font-weight: 600;
   color: var(--dark);
   background: #f0f4f8;
   padding: 0.25rem 0.5rem;
   border-radius: 6px;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 100%;               /* full width allowed */
+  white-space: normal;           /* allow wrapping */
+  overflow: visible;             /* no cut-off */
+  text-overflow: clip;            /* disable ellipsis */
+  line-height: 1.8;               /* nice readability for multi-line Arabic */
 }
-
 /* Small screens: allow more space */
 @media (max-width: 768px) {
   .verse-inline {
