@@ -23,19 +23,16 @@ const posMap = {
   PART: 'حرف',
   DET: 'أداة تعريف',
   PREP: 'حرف جر',
-  INTERJ: 'أداة تعجب',
-  // Extend as needed to cover your dataset
+  INTERJ: 'أداة تعجب'
 };
 
 export default function App() {
   const [qacData, setQacData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState([]);
-  const [selectedVerse, setSelectedVerse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Initialize: load corpus (qac.json) and verse text (quraan.txt)
   useEffect(() => {
     async function initialize() {
       try {
@@ -59,21 +56,18 @@ export default function App() {
       setResults([]);
       return;
     }
-
     const term = normalizeArabic(raw);
     if (!term) {
       setResults([]);
       return;
     }
 
-    // 1) Exact form match on flat entries
     let matchedEntry =
       qacData.find(e => {
         const form = e?.form ?? e?.word ?? '';
         return form && normalizeArabic(form) === term;
       }) || null;
 
-    // 2) Fallback: stem match
     if (!matchedEntry) {
       const inputStem = stemArabic(term);
       matchedEntry = qacData.find(e => {
@@ -87,10 +81,8 @@ export default function App() {
       return;
     }
 
-    // 3) Collect stem-family occurrences across flat dataset
     const occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
 
-    // 4) Deduplicate by form+location, then lightly sort by sura:verse:word
     const seen = new Set();
     const unique = [];
     for (const entry of occurrences) {
@@ -114,16 +106,7 @@ export default function App() {
   };
 
   const getVerseText = (sura, verse) => {
-    // Provided by loader after loadQuranText() warmed the cache
     return getVerseTextFromLoader(String(sura), String(verse)) || '';
-  };
-
-  const handleVerseClick = (sura, verse) => {
-    setSelectedVerse({
-      sura,
-      verse,
-      text: getVerseText(sura, verse)
-    });
   };
 
   return (
@@ -152,27 +135,15 @@ export default function App() {
           <h2 dir="rtl" lang="ar">تم العثور على {results.length} نتيجة</h2>
           <div className="results-grid">
             {results.map((entry, idx) => (
-              <div key={idx} className="entry-card">
-                <div className="arabic" dir="rtl" lang="ar">
-                  {buckwalterToArabic(entry.form)}
-                </div>
-                <div className="details" dir="rtl" lang="ar">
-                  <p><strong>الجذر:</strong> {buckwalterToArabic(entry.root)}</p>
-                  <p><strong>اللفظة:</strong> {buckwalterToArabic(entry.lemma)}</p>
-                  <p><strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}</p>
-                  <p
-                    className="location"
-                    onClick={() => handleVerseClick(entry.sura, entry.verse)}
-                  >
-                    سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
-                  </p>
-                  {entry.segments?.prefixes?.length > 0 && (
-                    <p>السوابق: {entry.segments.prefixes.map(buckwalterToArabic).join(' + ')}</p>
-                  )}
-                  <p>الجذر الصرفي: {buckwalterToArabic(entry.segments?.stem || '')}</p>
-                  {entry.segments?.suffixes?.length > 0 && (
-                    <p>اللواحق: {entry.segments.suffixes.map(buckwalterToArabic).join(' + ')}</p>
-                  )}
+              <div key={idx} className="result-row">
+                <a
+                  className="verse-ref"
+                  href={`#surah${entry.sura}-ayah${entry.verse}`}
+                >
+                  سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
+                </a>
+                <div className="verse-text">
+                  {getVerseText(entry.sura, entry.verse)}
                 </div>
               </div>
             ))}
@@ -181,15 +152,6 @@ export default function App() {
       ) : (
         <div className="status" dir="rtl" lang="ar">
           {searchTerm ? 'لم يتم العثور على نتائج' : 'أدخل كلمة للبحث'}
-        </div>
-      )}
-
-      {selectedVerse && (
-        <div className="verse-display">
-          <h3 dir="rtl" lang="ar">سورة {selectedVerse.sura}، آية {selectedVerse.verse}</h3>
-          <div className="verse-text" dir="rtl" lang="ar">
-            {selectedVerse.text}
-          </div>
         </div>
       )}
     </div>
