@@ -352,3 +352,29 @@ body {
     max-width: 100%;
   }
 }
+.result-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #ccc;
+}
+
+.verse-ref {
+  font-weight: bold;
+  color: #006400;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.verse-ref:hover {
+  text-decoration: underline;
+}
+
+.verse-text {
+  flex: 1;
+  direction: rtl;
+  text-align: right;
+  line-height: 1.8;
+}
