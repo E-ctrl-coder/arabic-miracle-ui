@@ -23,13 +23,14 @@ const posMap = {
   PART: 'حرف',
   DET: 'أداة تعريف',
   PREP: 'حرف جر',
-  INTERJ: 'أداة تعجب'
+  INTERJ: 'أداة تعجب',
 };
 
 export default function App() {
   const [qacData, setQacData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState([]);
+  const [openReference, setOpenReference] = useState(null); // {sura, verse, text}
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -56,6 +57,7 @@ export default function App() {
       setResults([]);
       return;
     }
+
     const term = normalizeArabic(raw);
     if (!term) {
       setResults([]);
@@ -102,11 +104,21 @@ export default function App() {
       return wa - wb;
     });
 
-    setResults(unique.slice(0, 100));
+    setResults(unique); // removed .slice(0, 100)
+    setOpenReference(null); // reset open verse on new search
   };
 
-  const getVerseText = (sura, verse) => {
-    return getVerseTextFromLoader(String(sura), String(verse)) || '';
+  const handleVerseClick = (sura, verse) => {
+    // If clicking the same verse that's already open, close it
+    if (openReference && openReference.sura === sura && openReference.verse === verse) {
+      setOpenReference(null);
+      return;
+    }
+    setOpenReference({
+      sura,
+      verse,
+      text: getVerseTextFromLoader(String(sura), String(verse)) || ''
+    });
   };
 
   return (
@@ -134,19 +146,44 @@ export default function App() {
         <div className="results">
           <h2 dir="rtl" lang="ar">تم العثور على {results.length} نتيجة</h2>
           <div className="results-grid">
-            {results.map((entry, idx) => (
-              <div key={idx} className="result-row">
-                <a
-                  className="verse-ref"
-                  href={`#surah${entry.sura}-ayah${entry.verse}`}
-                >
-                  سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
-                </a>
-                <div className="verse-text">
-                  {getVerseText(entry.sura, entry.verse)}
+            {results.map((entry, idx) => {
+              const isOpen = openReference &&
+                             openReference.sura === entry.sura &&
+                             openReference.verse === entry.verse;
+              return (
+                <div key={idx} className="entry-card">
+                  <div className="arabic" dir="rtl" lang="ar">
+                    {buckwalterToArabic(entry.form)}
+                  </div>
+                  <div className="details" dir="rtl" lang="ar">
+                    <p><strong>الجذر:</strong> {buckwalterToArabic(entry.root)}</p>
+                    <p><strong>اللفظة:</strong> {buckwalterToArabic(entry.lemma)}</p>
+                    <p><strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}</p>
+                    <p
+                      className="location"
+                      style={{ color: 'blue', cursor: 'pointer' }}
+                      onClick={() => handleVerseClick(entry.sura, entry.verse)}
+                    >
+                      سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
+                    </p>
+                    {entry.segments?.prefixes?.length > 0 && (
+                      <p>السوابق: {entry.segments.prefixes.map(buckwalterToArabic).join(' + ')}</p>
+                    )}
+                    <p>الجذر الصرفي: {buckwalterToArabic(entry.segments?.stem || '')}</p>
+                    {entry.segments?.suffixes?.length > 0 && (
+                      <p>اللواحق: {entry.segments.suffixes.map(buckwalterToArabic).join(' + ')}</p>
+                    )}
+                    {isOpen && (
+                      <div className="verse-inline" style={{ marginTop: '0.5em' }}>
+                        <div dir="rtl" lang="ar">
+                          {openReference.text}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : (
