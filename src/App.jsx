@@ -83,11 +83,21 @@ export default function App() {
       return;
     }
 
+    // Existing stem-family matches
     const occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
+
+    // NEW: If verb, expand to all verbs with same root
+    let expandedOccurrences = [...occurrences];
+    if (matchedEntry.tag === 'V' && matchedEntry.root) {
+      const sameRootVerbs = qacData.filter(e =>
+        e.tag === 'V' && e.root === matchedEntry.root
+      );
+      expandedOccurrences = expandedOccurrences.concat(sameRootVerbs);
+    }
 
     const seen = new Set();
     const unique = [];
-    for (const entry of occurrences) {
+    for (const entry of expandedOccurrences) {
       const key = `${entry.form}-${entry.location}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -104,12 +114,11 @@ export default function App() {
       return wa - wb;
     });
 
-    setResults(unique); // removed .slice(0, 100)
-    setOpenReference(null); // reset open verse on new search
+    setResults(unique);
+    setOpenReference(null);
   };
 
   const handleVerseClick = (sura, verse) => {
-    // If clicking the same verse that's already open, close it
     if (openReference && openReference.sura === sura && openReference.verse === verse) {
       setOpenReference(null);
       return;
