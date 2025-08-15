@@ -1,4 +1,3 @@
-// src/utils/buckwalterToArabic.js
 export default function buckwalterToArabic(text) {
   if (!text) return '';
   const map = {
@@ -10,7 +9,11 @@ export default function buckwalterToArabic(text) {
     'q': 'ق', 'k': 'ك', 'l': 'ل', 'm': 'م',
     'n': 'ن', 'h': 'ه', 'w': 'و', 'y': 'ي',
     'Y': 'ى', 'p': 'ة', "'": 'ء', '}': 'ئ',
-    '{': 'أ', '|': 'آ', '*': 'ٱ', // add more if needed
+    '{': 'أ', '|': 'آ', '*': 'ٱ'
   };
-  return text.split('').map(ch => map[ch] || ch).join('');
+
+  // Remove symbols and Latin vowels not used in Buckwalter
+  const cleaned = text.replace(/[@\^]/g, '').replace(/[aiuo]/g, '');
+
+  return cleaned.split('').map(ch => map[ch] || ch).join('');
 }
