@@ -378,7 +378,7 @@ body {
   text-align: right;
   line-height: 1.8;
 }
-.hl-stem {
-  color: #3498db;
-  font-weight: 700;
+.verse-inline .hl-stem {
+  color: #3498db !important;
+  font-weight: 700 !important;
 }
