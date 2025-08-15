@@ -323,3 +323,32 @@ body {
     margin-bottom: 1rem;
   }
 }
+/* Inline verse reveal beside the location */
+.location-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  direction: rtl;               /* keep Arabic reading order */
+  margin-top: 0.5rem;
+}
+
+.verse-inline {
+  margin-left: auto;            /* push verse text to the LEFT side */
+  font-family: var(--arabic-font);
+  font-weight: 600;
+  color: var(--dark);
+  background: #f0f4f8;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Small screens: allow more space */
+@media (max-width: 768px) {
+  .verse-inline {
+    max-width: 100%;
+  }
+}
