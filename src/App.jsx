@@ -202,6 +202,21 @@ export default function App() {
                     }}
                   />
 
+                  {/* Collapsed verse snippet */}
+                  {!isOpen && (
+                    <div
+                      className="verse-snippet"
+                      dir="rtl"
+                      lang="ar"
+                      dangerouslySetInnerHTML={{
+                        __html: highlightStemOrRoot(
+                          getVerseTextFromLoader(String(entry.sura), String(entry.verse)),
+                          entry
+                        )
+                      }}
+                    />
+                  )}
+
                   <div className="details" dir="rtl" lang="ar">
                     {/* Root */}
                     <p><strong>الجذر:</strong>{' '}
@@ -256,7 +271,8 @@ export default function App() {
                         )
                       }} />
                     </p>
-                     {/* Suffixes */}
+
+                    {/* Suffixes */}
                     {entry.segments?.suffixes?.length > 0 && (
                       <p>اللواحق:{' '}
                         <span
