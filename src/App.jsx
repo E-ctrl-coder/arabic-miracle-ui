@@ -260,8 +260,6 @@ export default function App() {
                         السوابق:{' '}
                         <span
                           dangerouslySetInnerHTML={{
-                            __html: highlightStemOr
-                          dangerouslySetInnerHTML={{
                             __html: highlightStemOrRoot(
                               entry.segments.prefixes
                                 .map(buckwalterToArabic)
