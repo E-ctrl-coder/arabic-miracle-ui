@@ -5,10 +5,11 @@ import {
   getVerseText as getVerseTextFromLoader,
   normalizeArabic as normalizeArabicFromLoader, // keep original loader fn name separate
   stemArabic,
-  findStemFamilyOccurrences
+  findStemFamilyOccurrences,
+  stripPrefixes              // ← NEW
 } from './loader/qacJsonLoader';
 import buckwalterToArabic from './utils/buckwalterToArabic';
-import normalizeArabic from './utils/normalizeArabic'; // ← NEW import for our stricter matcher
+import normalizeArabic from './utils/normalizeArabic'; // ← existing stricter matcher
 import './styles.css';
 
 const posMap = {
@@ -43,9 +44,11 @@ function highlightStemOrRoot(text, entry) {
   if (stemNorm) parts.push(stemNorm);
   if (rootNorm && rootNorm !== stemNorm) parts.push(rootNorm);
 
-  const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapeRegex = (s) =>
+    s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(
-    '(' + parts.map(escapeRegex).join('|') + ')' + '[\u064B-\u065F\u0670\u0640]*',
+    '(' + parts.map(escapeRegex).join('|') + ')' +
+      '[\\u064B-\\u065F\\u0670\\u0640]*',
     'g'
   );
 
@@ -86,7 +89,10 @@ export default function App() {
       return;
     }
 
-    const term = normalizeArabicFromLoader(raw);
+    // NEW: strip known proclitics/conjunctions before normalising
+    const stripped = stripPrefixes(raw);
+
+    const term = normalizeArabicFromLoader(stripped);
     if (!term) {
       setResults([]);
       return;
@@ -111,14 +117,16 @@ export default function App() {
       return;
     }
 
-    const occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
+    const occurrences =
+      findStemFamilyOccurrences(matchedEntry, qacData) || [];
     let expandedOccurrences = [...occurrences];
 
     if (matchedEntry.tag === 'V' && matchedEntry.root) {
       const sameRootVerbs = qacData.filter(
         (e) => e.tag === 'V' && e.root === matchedEntry.root
       );
-      expandedOccurrences = expandedOccurrences.concat(sameRootVerbs);
+      expandedOccurrences =
+        expandedOccurrences.concat(sameRootVerbs);
     }
 
     const seen = new Set();
@@ -145,21 +153,25 @@ export default function App() {
   };
 
   const handleVerseClick = (sura, verse) => {
-    if (openReference && openReference.sura === sura && openReference.verse === verse) {
+    if (
+      openReference &&
+      openReference.sura === sura &&
+      openReference.verse === verse
+    ) {
       setOpenReference(null);
       return;
     }
     setOpenReference({
       sura,
       verse,
-      text: getVerseTextFromLoader(String(sura), String(verse)) || ''
+      text:
+        getVerseTextFromLoader(String(sura), String(verse)) || ''
     });
   };
 
   return (
     <div className="app">
       <h1>المحلل الصرفي للقرآن الكريم</h1>
-
       <div className="search-box">
         <input
           type="text"
@@ -174,30 +186,34 @@ export default function App() {
       </div>
 
       {loading ? (
-        <div className="status" dir="rtl" lang="ar">جارٍ تحميل بيانات المتن...</div>
+        <div className="status" dir="rtl" lang="ar">
+          جارٍ تحميل بيانات المتن...
+        </div>
       ) : error ? (
         <div className="error" dir="rtl" lang="ar">{error}</div>
       ) : results.length > 0 ? (
         <div className="results">
-          <h2 dir="rtl" lang="ar">تم العثور على {results.length} نتيجة</h2>
+          <h2 dir="rtl" lang="ar">
+            تم العثور على {results.length} نتيجة
+          </h2>
           <div className="results-grid">
             {results.map((entry, idx) => {
               const isOpen =
                 openReference &&
                 openReference.sura === entry.sura &&
                 openReference.verse === entry.verse;
-
               const verseHTML = isOpen
                 ? highlightStemOrRoot(openReference.text, entry)
                 : null;
-
               return (
                 <div key={idx} className="entry-card">
                   {/* Token display block */}
                   <div className="token-display">
                     {entry.segments.prefixes.length > 0 && (
                       <span className="prefix">
-                        {entry.segments.prefixes.map(buckwalterToArabic).join('')}
+                        {entry.segments.prefixes
+                          .map(buckwalterToArabic)
+                          .join('')}
                       </span>
                     )}
                     <span className="hl-stem">
@@ -205,7 +221,9 @@ export default function App() {
                     </span>
                     {entry.segments.suffixes.length > 0 && (
                       <span className="suffix">
-                        {entry.segments.suffixes.map(buckwalterToArabic).join('')}
+                        {entry.segments.suffixes
+                          .map(buckwalterToArabic)
+                          .join('')}
                       </span>
                     )}
                   </div>
@@ -223,7 +241,8 @@ export default function App() {
                   />
 
                   <div className="details" dir="rtl" lang="ar">
-                    <p><strong>الجذر:</strong>{' '}
+                    <p>
+                      <strong>الجذر:</strong>{' '}
                       <span
                         dangerouslySetInnerHTML={{
                           __html: highlightStemOrRoot(
@@ -233,8 +252,8 @@ export default function App() {
                         }}
                       />
                     </p>
-
-                    <p><strong>اللفظة:</strong>{' '}
+                    <p>
+                      <strong>اللفظة:</strong>{' '}
                       <span
                         dangerouslySetInnerHTML={{
                           __html: highlightStemOrRoot(
@@ -244,17 +263,20 @@ export default function App() {
                         }}
                       />
                     </p>
-
-                    <p><strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}</p>
-
+                    <p>
+                      <strong>نوع الكلمة:</strong>{' '}
+                      {posMap[entry.tag] || entry.tag}
+                    </p>
                     <p
                       className="location"
                       style={{ color: 'blue', cursor: 'pointer' }}
-                      onClick={() => handleVerseClick(entry.sura, entry.verse)}
+                      onClick={() =>
+                        handleVerseClick(entry.sura, entry.verse)
+                      }
                     >
-                      سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
+                      سورة {entry.sura}، آية {entry.verse} (الكلمة{' '}
+                      {entry.wordNum})
                     </p>
-
                     {entry.segments?.prefixes?.length > 0 && (
                       <p>
                         السوابق:{' '}
