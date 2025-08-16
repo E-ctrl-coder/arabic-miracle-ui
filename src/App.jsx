@@ -26,42 +26,28 @@ const posMap = {
   INTERJ: 'أداة تعجب',
 };
 
-// Generic highlighter for any Arabic string against an entry’s stem/root
-function highlightStemOrRoot(arabicStr, entry) {
-  if (!arabicStr || !entry) return arabicStr;
-  const strip = s => s?.replace(/[\u064B-\u065F\u0670\u0640]/g, '') || '';
+// Highlight any Arabic string by wrapping matches of stem/root (with trailing diacritics) in <span class="hl-stem">
+function highlightStemOrRoot(text, entry) {
+  if (!text || !entry) return text;
+
+  const strip = (s) => s?.replace(/[\u064B-\u065F\u0670\u0640]/g, '') || '';
   const stem = strip(entry.segments?.stem || '');
   const root = strip(entry.root || '');
-  if (!stem && !root) return arabicStr;
+
+  if (!stem && !root) return text;
 
   const parts = [];
   if (stem) parts.push(stem);
   if (root && root !== stem) parts.push(root);
-  const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   const pattern = new RegExp(
     '(' + parts.map(escapeRegex).join('|') + ')' + '[\u064B-\u065F\u0670\u0640]*',
     'g'
   );
-  return arabicStr.replace(pattern, m => `<span class="hl-stem">${m}</span>`);
-}
 
-// Verse‑level highlighter (unchanged)
-function highlightTokenStemInVerse(verse, entry) {
-  if (!verse || !entry) return verse;
-  const strip = s => s?.replace(/[\u064B-\u065F\u0670\u0640]/g, '') || '';
-  const stem = strip(entry.segments?.stem || '');
-  const root = strip(entry.root || '');
-  if (!stem && !root) return verse;
-
-  const patternParts = [];
-  if (stem) patternParts.push(stem);
-  if (root && root !== stem) patternParts.push(root);
-  const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(
-    '(' + patternParts.map(escapeRegex).join('|') + ')' + '[\u064B-\u065F\u0670\u0640]*',
-    'g'
-  );
-  return verse.replace(pattern, match => `<span class="hl-stem">${match}</span>`);
+  return text.replace(pattern, (match) => `<span class="hl-stem">${match}</span>`);
 }
 
 export default function App() {
@@ -72,6 +58,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Load data once at start
   useEffect(() => {
     async function initialize() {
       try {
@@ -89,41 +76,54 @@ export default function App() {
     initialize();
   }, []);
 
+  // Search and expansion logic
   const handleSearch = () => {
     const raw = searchTerm.trim();
     if (!raw || loading) {
       setResults([]);
       return;
     }
+
     const term = normalizeArabic(raw);
     if (!term) {
       setResults([]);
       return;
     }
+
+    // 1) Exact form match (normalized)
     let matchedEntry =
-      qacData.find(e => {
+      qacData.find((e) => {
         const form = e?.form ?? e?.word ?? '';
         return form && normalizeArabic(form) === term;
       }) || null;
+
+    // 2) Fallback by stem match
     if (!matchedEntry) {
       const inputStem = stemArabic(term);
-      matchedEntry = qacData.find(e => {
+      matchedEntry = qacData.find((e) => {
         const tokenStem = e?.segments?.stem ?? e?.stem ?? null;
         return tokenStem && tokenStem === inputStem;
       }) || null;
     }
+
     if (!matchedEntry) {
       setResults([]);
       return;
     }
+
+    // Base occurrences from stem family
     const occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
     let expandedOccurrences = [...occurrences];
+
+    // If the matched token is a verb with a root, include all verbs of the same root
     if (matchedEntry.tag === 'V' && matchedEntry.root) {
-      const sameRootVerbs = qacData.filter(e =>
-        e.tag === 'V' && e.root === matchedEntry.root
+      const sameRootVerbs = qacData.filter(
+        (e) => e.tag === 'V' && e.root === matchedEntry.root
       );
       expandedOccurrences = expandedOccurrences.concat(sameRootVerbs);
     }
+
+    // Deduplicate
     const seen = new Set();
     const unique = [];
     for (const entry of expandedOccurrences) {
@@ -133,6 +133,8 @@ export default function App() {
         unique.push(entry);
       }
     }
+
+    // Sort by sura, verse, word number
     unique.sort((a, b) => {
       const sa = Number(a.sura), sb = Number(b.sura);
       if (sa !== sb) return sa - sb;
@@ -141,10 +143,12 @@ export default function App() {
       const wa = Number(a.wordNum), wb = Number(b.wordNum);
       return wa - wb;
     });
+
     setResults(unique);
     setOpenReference(null);
   };
 
+  // Toggle verse expansion and load verse text
   const handleVerseClick = (sura, verse) => {
     if (openReference && openReference.sura === sura && openReference.verse === verse) {
       setOpenReference(null);
@@ -183,16 +187,22 @@ export default function App() {
           <h2 dir="rtl" lang="ar">تم العثور على {results.length} نتيجة</h2>
           <div className="results-grid">
             {results.map((entry, idx) => {
-              const isOpen = openReference &&
-                             openReference.sura === entry.sura &&
-                             openReference.verse === entry.verse;
+              const isOpen =
+                openReference &&
+                openReference.sura === entry.sura &&
+                openReference.verse === entry.verse;
+
               const verseHTML = isOpen
-                ? highlightTokenStemInVerse(openReference.text, entry)
+                ? highlightStemOrRoot(openReference.text, entry)
                 : null;
 
               return (
                 <div key={idx} className="entry-card">
-                  <div className="arabic" dir="rtl" lang="ar"
+                  {/* Main word */}
+                  <div
+                    className="arabic"
+                    dir="rtl"
+                    lang="ar"
                     dangerouslySetInnerHTML={{
                       __html: highlightStemOrRoot(
                         buckwalterToArabic(entry.form),
@@ -200,28 +210,36 @@ export default function App() {
                       )
                     }}
                   />
+
                   <div className="details" dir="rtl" lang="ar">
+                    {/* Root */}
                     <p><strong>الجذر:</strong>{' '}
                       <span
                         dangerouslySetInnerHTML={{
                           __html: highlightStemOrRoot(
-                            buckwalterToArabic(entry.root),
+                            buckwalterToArabic(entry.root || ''),
                             entry
                           )
                         }}
                       />
                     </p>
+
+                    {/* Lemma */}
                     <p><strong>اللفظة:</strong>{' '}
                       <span
                         dangerouslySetInnerHTML={{
                           __html: highlightStemOrRoot(
-                            buckwalterToArabic(entry.lemma),
+                            buckwalterToArabic(entry.lemma || ''),
                             entry
                           )
                         }}
                       />
                     </p>
+
+                    {/* POS */}
                     <p><strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}</p>
+
+                    {/* Location (click to toggle verse) */}
                     <p
                       className="location"
                       style={{ color: 'blue', cursor: 'pointer' }}
@@ -229,6 +247,8 @@ export default function App() {
                     >
                       سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
                     </p>
+
+                    {/* Prefixes */}
                     {entry.segments?.prefixes?.length > 0 && (
                       <p>
                         السوابق:{' '}
@@ -241,3 +261,60 @@ export default function App() {
                               entry
                             )
                           }}
+                        />
+                      </p>
+                    )}
+
+                    {/* Stem */}
+                    <p>
+                      الجذر الصرفي:{' '}
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: highlightStemOrRoot(
+                            buckwalterToArabic(entry.segments?.stem || ''),
+                            entry
+                          )
+                        }}
+                      />
+                    </p>
+
+                    {/* Suffixes */}
+                    {entry.segments?.suffixes?.length > 0 && (
+                      <p>
+                        اللواحق:{' '}
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: highlightStemOrRoot(
+                              entry.segments.suffixes
+                                .map(buckwalterToArabic)
+                                .join(' + '),
+                              entry
+                            )
+                          }}
+                        />
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Expanded verse with highlights */}
+                  {isOpen && verseHTML && (
+                    <div
+                      className="verse-text"
+                      dir="rtl"
+                      lang="ar"
+                      dangerouslySetInnerHTML={{ __html: verseHTML }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="status" dir="rtl" lang="ar">
+          {searchTerm ? 'لم يتم العثور على نتائج' : 'أدخل كلمة للبحث'}
+        </div>
+      )}
+    </div>
+  );
+}
