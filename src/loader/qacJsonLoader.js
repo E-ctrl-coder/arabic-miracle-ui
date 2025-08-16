@@ -72,7 +72,7 @@ export const stemArabic = (word) => {
     }
   } while (stemmed !== prev && stemmed.length > 2);
 
-  // Common Arabic suffixes
+  // Common Arabic suffixes (deduplicated)
   const suffixes = [
     /كما$/, /كم$/, /كن$/, /نا$/, /ني$/, /هم$/, /هن$/, /ها$/, /ه$/, /ك$/,
     /وا$/, /ات$/, /ون$/, /ين$/, /ان$/
@@ -136,8 +136,25 @@ export const getVerseText = (sura, verse) => {
   return quranTextCache[`${sura}:${verse}`] || "Verse not found";
 };
 
+/**
+ * Analyze a QAC entry, ensuring sura/verse/wordNum are always populated
+ */
 export const analyzeEntry = (entry) => {
   if (!entry) return null;
+
+  // Fallback: parse sura/verse/wordNum from location if not explicitly present
+  let sura = entry.sura;
+  let verse = entry.verse;
+  let wordNum = entry.wordNum;
+
+  if ((!sura || !verse) && entry.location) {
+    const parts = entry.location.split(':');
+    if (parts.length >= 2) {
+      sura = sura || parts[0];
+      verse = verse || parts[1];
+      if (parts.length >= 3) wordNum = wordNum || parts[2];
+    }
+  }
 
   return {
     form: entry.form,
@@ -146,9 +163,9 @@ export const analyzeEntry = (entry) => {
     lemma: entry.lemma || "N/A",
     tag: entry.tag || "N/A",
     location: entry.location,
-    sura: entry.sura,
-    verse: entry.verse,
-    wordNum: entry.wordNum,
+    sura,
+    verse,
+    wordNum,
     prefixes: entry.segments?.prefixes || [],
     stem: entry.segments?.stem || "",
     suffixes: entry.segments?.suffixes || []
