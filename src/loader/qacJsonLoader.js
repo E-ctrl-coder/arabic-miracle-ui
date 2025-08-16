@@ -47,14 +47,30 @@ export const stemArabic = (word) => {
 
   let stemmed = normalized;
 
-  // Iteratively strip common leading clitics and imperfect prefixes
-  const prefixPatterns = [
-    /^(وال|فال|بال|كال)/, // fused clitics + "ال"
-    /^ال/,                // definite article
-    /^(و|ف|س)/,           // conjunctions/future
-    /^(ل|ب|ك)/,           // proclitics
-    /^(ي|ت|ن|أ)/          // imperfect verb prefixes (ya-, ta-, na-, ’a-)
-  ];
+  // Iteratively strip common leading clitics, definite article, and imperfect verb prefixes
+const prefixPatterns = [
+  // Fused multi-letter clitics with definite article
+  /^(وال|فال|بال|كال|ولل|فلل|بلل|كلل)/,
+
+  // Conjunctions + proclitics + "ال"
+  /^(و?ف?ب?ل?ال)/,
+
+  // Just definite article
+  /^ال/,
+
+  // Conjunction(s) + future marker(s)
+  /^(وس|فس|وسوف|فسوف)/,
+
+  // Conjunctions and proclitics in any order (max 3 letters) before a verb prefix
+  /^(و?ف?ب?ل?[يتنأ])/,
+
+  // Single proclitics
+  /^(و|ف|س|ل|ب|ك)/,
+
+  // Imperfect verb prefixes
+  /^(ي|ت|ن|أ)/
+];
+
 
   let prev;
   do {
