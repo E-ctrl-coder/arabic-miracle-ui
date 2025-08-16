@@ -262,34 +262,12 @@ export default function App() {
     <span
       dangerouslySetInnerHTML={{
         __html: highlightStemOrRoot(
-          entry.segments.suffixToArabic).join('es.map(buckwalter + '),
+          entry.segments.suffixes
+            .map(buckwalterToArabic)
+            .join(' + '),
           entry
         )
       }}
     />
   </p>
 )}
-
-{isOpen className="verse && (
-  <div
-   -inline"
-    dir="rtl"
-    lang="ar"
-    dangerouslySetInnerHTML={{ __  />
-)}
-</div> {/*html: verseHTML }}
- closes .details */}
-</div> {/* closes .entry-card */}
-))} {/* closes results.map */}
-</div> {/* closes .results-grid */}
-</div> {/* closes .results */}
-) : (
-  <div className="status" dir="rtl" lang="ar">
-    {searchTerm ? 'لم يتم العثور على نتائج' : 'أدخل كلمة للبحث'}
-  </div>
-)}
-</div> {/* closes .app */}
-);
-}
-
-export default App;
