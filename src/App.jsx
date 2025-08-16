@@ -256,18 +256,20 @@ export default function App() {
                         )
                       }} />
                     </p>
-{/* Suffixes */}
-{entry.segments?.suffixes?.length > 0 && (
-  <p>اللواحق:{' '}
-    <span
-      dangerouslySetInnerHTML={{
-        __html: highlightStemOrRoot(
-          entry.segments.suffixes
-            .map(buckwalterToArabic)
-            .join(' + '),
-          entry
-        )
-      }}
-    />
-  </p>
-)}
+  {/* Suffixes */}
+  {entry.segments?.suffixes?.length > 0 && (
+    <p>اللواحق:{' '}
+      <span
+        dangerouslySetInnerHTML={{
+          __html: highlightStemOrRoot(
+            entry.segments.suffixes
+              .map(buckwalterToArabic)
+              .join(' + '),
+            entry
+          )
+        }}
+      />
+    </p>
+  )}
+
+</div>
