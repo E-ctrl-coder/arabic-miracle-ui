@@ -202,21 +202,6 @@ export default function App() {
                     }}
                   />
 
-                  {/* Collapsed verse snippet */}
-                  {!isOpen && (
-                    <div
-                      className="verse-snippet"
-                      dir="rtl"
-                      lang="ar"
-                      dangerouslySetInnerHTML={{
-                        __html: highlightStemOrRoot(
-                          getVerseTextFromLoader(String(entry.sura), String(entry.verse)),
-                          entry
-                        )
-                      }}
-                    />
-                  )}
-
                   <div className="details" dir="rtl" lang="ar">
                     {/* Root */}
                     <p><strong>الجذر:</strong>{' '}
@@ -271,8 +256,7 @@ export default function App() {
                         )
                       }} />
                     </p>
-
-                    {/* Suffixes */}
+                     {/* Suffixes */}
                     {entry.segments?.suffixes?.length > 0 && (
                       <p>اللواحق:{' '}
                         <span
@@ -287,7 +271,8 @@ export default function App() {
                         />
                       </p>
                     )}
-                  </div> 
+                  </div> {/* closes .details */}
+
                   {isOpen && verseHTML && (
                     <div
                       className="verse-text"
@@ -296,14 +281,14 @@ export default function App() {
                       dangerouslySetInnerHTML={{ __html: verseHTML }}
                     />
                   )}
-                </div> 
+                </div> {/* closes .entry-card */}
               );
             })}
-          </div> 
-        </div> 
+          </div> {/* closes .results-grid */}
+        </div> {/* closes .results */}
       ) : (
         <div className="status" dir="rtl" lang="ar">لا توجد نتائج</div>
       )}
-    </div>
+    </div> {/* closes .app */}
   );
 }
