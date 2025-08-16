@@ -271,8 +271,7 @@ export default function App() {
                         />
                       </p>
                     )}
-                  </div> {/* closes .details */}
-
+                  </div> 
                   {isOpen && verseHTML && (
                     <div
                       className="verse-text"
@@ -281,14 +280,14 @@ export default function App() {
                       dangerouslySetInnerHTML={{ __html: verseHTML }}
                     />
                   )}
-                </div> {/* closes .entry-card */}
+                </div> 
               );
             })}
-          </div> {/* closes .results-grid */}
-        </div> {/* closes .results */}
+          </div> 
+        </div> 
       ) : (
         <div className="status" dir="rtl" lang="ar">لا توجد نتائج</div>
       )}
-    </div> {/* closes .app */}
+    </div>
   );
 }
