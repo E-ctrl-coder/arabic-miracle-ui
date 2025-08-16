@@ -30,18 +30,13 @@ const posMap = {
 // Updated: normalize both verse text and patterns
 function highlightStemOrRoot(text, entry) {
   if (!text || !entry) return text;
-
-  // Normalise the verse text
   const verseNorm = normalizeArabic(text);
-
-  // Convert and normalise stem/root from entry
   const stemNorm = normalizeArabic(
     buckwalterToArabic(entry.segments?.stem || '')
   );
   const rootNorm = normalizeArabic(
     buckwalterToArabic(entry.root || '')
   );
-
   if (!stemNorm && !rootNorm) return text;
 
   const parts = [];
@@ -54,8 +49,6 @@ function highlightStemOrRoot(text, entry) {
     'g'
   );
 
-  // Apply highlighting to the normalised verse text, but preserve matched chars from original
-  let i = 0;
   return verseNorm.replace(pattern, (match) => {
     return `<span class="hl-stem">${match}</span>`;
   });
@@ -200,6 +193,23 @@ export default function App() {
 
               return (
                 <div key={idx} className="entry-card">
+                  {/* Token display block */}
+                  <div className="token-display">
+                    {entry.segments.prefixes.length > 0 && (
+                      <span className="prefix">
+                        {entry.segments.prefixes.map(buckwalterToArabic).join('')}
+                      </span>
+                    )}
+                    <span className="hl-stem">
+                      {buckwalterToArabic(entry.segments.stem)}
+                    </span>
+                    {entry.segments.suffixes.length > 0 && (
+                      <span className="suffix">
+                        {entry.segments.suffixes.map(buckwalterToArabic).join('')}
+                      </span>
+                    )}
+                  </div>
+
                   <div
                     className="arabic"
                     dir="rtl"
@@ -249,6 +259,8 @@ export default function App() {
                       <p>
                         السوابق:{' '}
                         <span
+                          dangerouslySetInnerHTML={{
+                            __html: highlightStemOr
                           dangerouslySetInnerHTML={{
                             __html: highlightStemOrRoot(
                               entry.segments.prefixes
