@@ -6,7 +6,7 @@ import {
   normalizeArabic as normalizeArabicFromLoader, // keep original loader fn name separate
   stemArabic,
   findStemFamilyOccurrences,
-  stripPrefixes              // ← NEW
+  stripPrefixes // ← NEW
 } from './loader/qacJsonLoader';
 import buckwalterToArabic from './utils/buckwalterToArabic';
 import normalizeArabic from './utils/normalizeArabic'; // ← existing stricter matcher
