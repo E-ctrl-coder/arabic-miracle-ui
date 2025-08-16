@@ -265,4 +265,8 @@ export default function App() {
                             entry.segments.suffixes.map(buckwalterToArabic).join(' + '),
                             entry
                           )
-                       
+                       }}
+    />
+  </p>
+)}
+
