@@ -41,10 +41,11 @@ function highlightStemOrRoot(text, entry) {
   const parts = [];
   if (stemNorm) parts.push(stemNorm);
   if (rootNorm && rootNorm !== stemNorm) parts.push(rootNorm);
-  const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapeRegex = (s) =>
+    s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(
     '(' + parts.map(escapeRegex).join('|') + ')' +
-    '[\u064B-\u065F\u0670\u0640]*',
+      '[\\u064B-\\u065F\\u0670\\u0640]*',
     'g'
   );
   return verseNorm.replace(pattern, (match) => {
@@ -69,7 +70,9 @@ export default function App() {
         ]);
         setQacData(Array.isArray(data) ? data : []);
       } catch (err) {
-        setError(`فشل تحميل البيانات: ${err?.message || String(err)}`);
+        setError(
+          `فشل تحميل البيانات: ${err?.message || String(err)}`
+        );
       } finally {
         setLoading(false);
       }
@@ -83,7 +86,6 @@ export default function App() {
       setResults([]);
       return;
     }
-
     // Strip known prefixes and normalize
     const stripped = stripPrefixes(raw);
     const term = normalizeArabicFromLoader(stripped);
@@ -92,27 +94,39 @@ export default function App() {
       return;
     }
 
-    let matchedEntry = qacData.find((e) => {
-      const form = e?.form ?? e?.word ?? '';
-      return form && normalizeArabicFromLoader(form) === term;
-    }) || null;
+    let matchedEntry =
+      qacData.find((e) => {
+        const form = e?.form ?? e?.word ?? '';
+        return (
+          form &&
+          normalizeArabicFromLoader(form) === term
+        );
+      }) || null;
 
     if (!matchedEntry) {
       const inputStem = stemArabic(term);
       matchedEntry = qacData.find((e) => {
-        const tokenStem = e?.segments?.stem ?? e?.stem ?? null;
+        const tokenStem =
+          e?.segments?.stem ?? e?.stem ?? null;
         return tokenStem && tokenStem === inputStem;
       }) || null;
     }
 
     let occurrences = [];
+
     if (matchedEntry) {
-      occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
+      occurrences =
+        findStemFamilyOccurrences(
+          matchedEntry,
+          qacData
+        ) || [];
 
       // Verb root expansion
       if (matchedEntry.tag === 'V' && matchedEntry.root) {
         const sameRootVerbs = qacData.filter(
-          (e) => e.tag === 'V' && e.root === matchedEntry.root
+          (e) =>
+            e.tag === 'V' &&
+            e.root === matchedEntry.root
         );
         occurrences = occurrences.concat(sameRootVerbs);
       }
@@ -120,8 +134,11 @@ export default function App() {
       // NEW: Fallback direct scan if nothing matched
       const inputStem = stemArabic(term);
       const directMatches = qacData.filter((e) => {
-        const formNorm = normalizeArabicFromLoader(e?.form ?? e?.word ?? '');
-        const stemVal = e?.segments?.stem ?? e?.stem ?? '';
+        const formNorm = normalizeArabicFromLoader(
+          e?.form ?? e?.word ?? ''
+        );
+        const stemVal =
+          e?.segments?.stem ?? e?.stem ?? '';
         return formNorm === term || stemVal === inputStem;
       });
       occurrences = directMatches;
@@ -163,7 +180,10 @@ export default function App() {
       sura,
       verse,
       text:
-        getVerseTextFromLoader(String(sura), String(verse)) || ''
+        getVerseTextFromLoader(
+          String(sura),
+          String(verse)
+        ) || ''
     });
   };
 
@@ -174,8 +194,12 @@ export default function App() {
         <input
           type="text"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          onChange={(e) =>
+            setSearchTerm(e.target.value)
+          }
+          onKeyDown={(e) =>
+            e.key === 'Enter' && handleSearch()
+          }
           placeholder="أدخل كلمة عربية"
           dir="rtl"
           lang="ar"
@@ -188,7 +212,9 @@ export default function App() {
           جارٍ تحميل بيانات المتن...
         </div>
       ) : error ? (
-        <div className="error" dir="rtl" lang="ar">{error}</div>
+        <div className="error" dir="rtl" lang="ar">
+          {error}
+        </div>
       ) : results.length > 0 ? (
         <div className="results">
           <h2 dir="rtl" lang="ar">
@@ -201,12 +227,19 @@ export default function App() {
                 openReference.sura === entry.sura &&
                 openReference.verse === entry.verse;
               const verseHTML = isOpen
-                ? highlightStemOrRoot(openReference.text, entry)
+                ? highlightStemOrRoot(
+                    openReference.text,
+                    entry
+                  )
                 : null;
               return (
-                <div key={idx} className="entry-card">
+                <div
+                  key={idx}
+                  className="entry-card"
+                >
                   <div className="token-display">
-                    {entry.segments.prefixes.length > 0 && (
+                    {entry.segments.prefixes.length >
+                      0 && (
                       <span className="prefix">
                         {entry.segments.prefixes
                           .map(buckwalterToArabic)
@@ -214,9 +247,12 @@ export default function App() {
                       </span>
                     )}
                     <span className="hl-stem">
-                      {buckwalterToArabic(entry.segments.stem)}
+                      {buckwalterToArabic(
+                        entry.segments.stem
+                      )}
                     </span>
-                    {entry.segments.suffixes.length > 0 && (
+                    {entry.segments.suffixes.length >
+                      0 && (
                       <span className="suffix">
                         {entry.segments.suffixes
                           .map(buckwalterToArabic)
@@ -231,19 +267,27 @@ export default function App() {
                     lang="ar"
                     dangerouslySetInnerHTML={{
                       __html: highlightStemOrRoot(
-                        buckwalterToArabic(entry.form),
+                        buckwalterToArabic(
+                          entry.form
+                        ),
                         entry
                       )
                     }}
                   />
 
-                  <div className="details" dir="rtl" lang="ar">
+                  <div
+                    className="details"
+                    dir="rtl"
+                    lang="ar"
+                  >
                     <p>
                       <strong>الجذر:</strong>{' '}
                       <span
                         dangerouslySetInnerHTML={{
                           __html: highlightStemOrRoot(
-                            buckwalterToArabic(entry.root || ''),
+                            buckwalterToArabic(
+                              entry.root || ''
+                            ),
                             entry
                           )
                         }}
@@ -254,7 +298,9 @@ export default function App() {
                       <span
                         dangerouslySetInnerHTML={{
                           __html: highlightStemOrRoot(
-                            buckwalterToArabic(entry.lemma || ''),
+                            buckwalterToArabic(
+                              entry.lemma || ''
+                            ),
                             entry
                           )
                         }}
