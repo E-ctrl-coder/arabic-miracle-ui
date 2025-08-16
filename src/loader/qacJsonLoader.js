@@ -12,70 +12,56 @@ const QAC_PATHS = [
 let cachedData = null;
 let quranTextCache = null;
 
-/**
- * Normalizes Arabic text by:
- * - Removing diacritics
- * - Standardizing character variants
- * - Trimming whitespace
- */
+/** Normalise Arabic text */
 export const normalizeArabic = (text) => {
   if (!text) return '';
-
   return text
     .normalize('NFKD')
-    // Remove diacritics and tatweel
     .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
-    // Normalize Alef variants and hamza-on-carriers
     .replace(/[إأآءؤئ]/g, 'ا')
-    // Normalize other characters
     .replace(/ة/g, 'ه')
     .replace(/ى/g, 'ي')
-    // Remove non-Arabic characters
     .replace(/[^\u0600-\u06FF]/g, '')
     .trim();
 };
 
+// Common leading clitics, definite article, and imperfect verb prefixes
+const prefixPatterns = [
+  /^(وال|فال|بال|كال|ولل|فلل|بلل|كلل)/,
+  /^(و?ف?ب?ل?ال)/,
+  /^ال/,
+  /^(وس|فس|وسوف|فسوف)/,
+  /^(و?ف?ب?ل?[يتنأ])/,
+  /^(و|ف|س|ل|ب|ك)/,
+  /^(ي|ت|ن|أ)/
+];
+
 /**
- * Conservative Arabic stemmer that:
- * - Iteratively removes frequent proclitics and imperfect prefixes
- * - Removes common suffixes
- * - Preserves the core as much as possible
+ * Exported helper so App.jsx can pre‑strip search terms
+ * using same authoritative patterns as stemArabic
  */
+export function stripPrefixes(word) {
+  let current = normalizeArabic(word);
+  let changed;
+  do {
+    changed = false;
+    for (const pattern of prefixPatterns) {
+      if (pattern.test(current)) {
+        current = current.replace(pattern, '');
+        changed = true;
+        break;
+      }
+    }
+  } while (changed && current.length > 2);
+  return current;
+}
+
+/** Conservative Arabic stemmer */
 export const stemArabic = (word) => {
   const normalized = normalizeArabic(word);
   if (normalized.length < 3) return normalized;
 
   let stemmed = normalized;
-
-  // Common leading clitics, definite article, and imperfect verb prefixes
-  const prefixPatterns = [
-    /^(وال|فال|بال|كال|ولل|فلل|بلل|كلل)/, // fused multi-letter clitics + "ال"
-    /^(و?ف?ب?ل?ال)/,                      // conjunctions + proclitics + "ال"
-    /^ال/,                                 // definite article
-    /^(وس|فس|وسوف|فسوف)/,                 // conjunction(s) + future markers
-    /^(و?ف?ب?ل?[يتنأ])/,                   // clitics before imperfect prefix
-    /^(و|ف|س|ل|ب|ك)/,                      // single proclitics
-    /^(ي|ت|ن|أ)/                           // imperfect verb prefixes
-  ];
-
-  // Helper: strip prefixes iteratively
-  // Exported so App.jsx can pre‑strip search terms
-  // using the same authoritative patterns as stemArabic
-  export function stripPrefixes(word) {
-    let current = normalizeArabic(word);
-    let changed;
-    do {
-      changed = false;
-      for (const pattern of prefixPatterns) {
-        if (pattern.test(current)) {
-          current = current.replace(pattern, '');
-          changed = true;
-          break;
-        }
-      }
-    } while (changed && current.length > 2);
-    return current;
-  }
 
   // Iteratively strip prefixes
   let prev;
@@ -88,65 +74,35 @@ export const stemArabic = (word) => {
 
   // Common Arabic suffixes
   const suffixes = [
-    /كما$/, /كم$/, /كن$/, /نا$/, /ني$/, /نا$/, /هم$/, /هن$/, /ها$/, /ه$/, /ك$/,
+    /كما$/, /كم$/, /كن$/, /نا$/, /ني$/, /هم$/, /هن$/, /ها$/, /ه$/, /ك$/,
     /وا$/, /ات$/, /ون$/, /ين$/, /ان$/
   ];
-
   for (const s of suffixes) {
     const next = stemmed.replace(s, '');
     if (next.length >= 2) stemmed = next;
   }
-
   return stemmed.length > 1 ? stemmed : normalized;
 };
 
 /**
- * Loads and caches QAC data with:
- * - Multiple fallback paths
- * - Data validation
- * - Pre-processing
+ * Loads and caches QAC JSON data from known paths
  */
 export const loadQACData = async () => {
   if (cachedData) return cachedData;
 
-  let lastError = null;
-
   for (const path of QAC_PATHS) {
     try {
       const response = await fetch(path);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (response.ok) {
+        cachedData = await response.json();
+        return cachedData;
       }
-
-      const data = await response.json();
-
-      // Validate data structure
-      if (!Array.isArray(data)) throw new Error("Data is not an array");
-      if (data.length === 0) throw new Error("Empty dataset");
-      if (!data[0].location || !data[0].form) throw new Error("Missing required fields");
-
-      // Pre-process data
-      cachedData = data.map(entry => ({
-        ...entry,
-        normalizedForm: normalizeArabic(entry.form),
-        stem: stemArabic(entry.form), // derived convenience stem
-        segments: {
-          ...(entry.segments || {}) // preserve original segmentation
-        },
-        sura: entry.location.split(':')[0],
-        verse: entry.location.split(':')[1],
-        wordNum: entry.location.split(':')[2]
-      }));
-
-      return cachedData;
-    } catch (error) {
-      lastError = error;
-      console.warn(`Failed to load from ${path}:`, error.message);
+    } catch (err) {
+      console.warn(`Failed to load QAC from ${path}:`, err);
     }
   }
-
-  throw new Error(`All data loading attempts failed. Last error: ${lastError?.message}`);
+  console.error('Unable to load QAC data from any known path.');
+  return [];
 };
 
 /**
