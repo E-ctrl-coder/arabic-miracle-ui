@@ -47,31 +47,37 @@ export const stemArabic = (word) => {
 
   let stemmed = normalized;
 
-  // Iteratively strip common leading clitics, definite article, and imperfect verb prefixes
-const prefixPatterns = [
-  // Fused multi-letter clitics with definite article
-  /^(وال|فال|بال|كال|ولل|فلل|بلل|كلل)/,
+  // Common leading clitics, definite article, and imperfect verb prefixes
+  const prefixPatterns = [
+    /^(وال|فال|بال|كال|ولل|فلل|بلل|كلل)/, // fused multi-letter clitics + "ال"
+    /^(و?ف?ب?ل?ال)/,                      // conjunctions + proclitics + "ال"
+    /^ال/,                                 // definite article
+    /^(وس|فس|وسوف|فسوف)/,                 // conjunction(s) + future markers
+    /^(و?ف?ب?ل?[يتنأ])/,                   // clitics before imperfect prefix
+    /^(و|ف|س|ل|ب|ك)/,                      // single proclitics
+    /^(ي|ت|ن|أ)/                           // imperfect verb prefixes
+  ];
 
-  // Conjunctions + proclitics + "ال"
-  /^(و?ف?ب?ل?ال)/,
+  // Helper: strip prefixes iteratively
+  // Exported so App.jsx can pre‑strip search terms
+  // using the same authoritative patterns as stemArabic
+  export function stripPrefixes(word) {
+    let current = normalizeArabic(word);
+    let changed;
+    do {
+      changed = false;
+      for (const pattern of prefixPatterns) {
+        if (pattern.test(current)) {
+          current = current.replace(pattern, '');
+          changed = true;
+          break;
+        }
+      }
+    } while (changed && current.length > 2);
+    return current;
+  }
 
-  // Just definite article
-  /^ال/,
-
-  // Conjunction(s) + future marker(s)
-  /^(وس|فس|وسوف|فسوف)/,
-
-  // Conjunctions and proclitics in any order (max 3 letters) before a verb prefix
-  /^(و?ف?ب?ل?[يتنأ])/,
-
-  // Single proclitics
-  /^(و|ف|س|ل|ب|ك)/,
-
-  // Imperfect verb prefixes
-  /^(ي|ت|ن|أ)/
-];
-
-
+  // Iteratively strip prefixes
   let prev;
   do {
     prev = stemmed;
@@ -120,16 +126,13 @@ export const loadQACData = async () => {
       if (data.length === 0) throw new Error("Empty dataset");
       if (!data[0].location || !data[0].form) throw new Error("Missing required fields");
 
-      // Pre-process data:
-      // - Preserve QAC's own segments.stem exactly as provided (no overriding)
-      // - Add normalizedForm and a derived 'stem' for optional use elsewhere
+      // Pre-process data
       cachedData = data.map(entry => ({
         ...entry,
         normalizedForm: normalizeArabic(entry.form),
-        // Keep a derived convenience stem, but DO NOT write it into segments.stem
-        stem: stemArabic(entry.form),
+        stem: stemArabic(entry.form), // derived convenience stem
         segments: {
-          ...(entry.segments || {}) // preserve original segmentation including stem
+          ...(entry.segments || {}) // preserve original segmentation
         },
         sura: entry.location.split(':')[0],
         verse: entry.location.split(':')[1],
@@ -172,20 +175,11 @@ export const loadQuranText = async () => {
   }
 };
 
-/**
- * Gets verse text by sura and verse number
- */
 export const getVerseText = (sura, verse) => {
   if (!quranTextCache) return "Loading verse...";
   return quranTextCache[`${sura}:${verse}`] || "Verse not found";
 };
 
-/**
- * Analyzes a single entry to extract:
- * - Morphological features
- * - Location details
- * - Segments breakdown
- */
 export const analyzeEntry = (entry) => {
   if (!entry) return null;
 
@@ -205,45 +199,29 @@ export const analyzeEntry = (entry) => {
   };
 };
 
-/**
- * Gets verse location details in format:
- * { sura, verse, wordNum }
- */
 export const getVerseLocation = (entry) => {
   if (!entry?.location) return { sura: "0", verse: "0", wordNum: "0" };
-
   const [sura, verse, wordNum] = entry.location.split(':');
   return { sura, verse, wordNum };
 };
 
-/**
- * Finds all occurrences for a token based on its exact QAC morphological stem.
- * Root is NOT used here. No fallback to derived/stemArabic().
- */
 export const findStemFamilyOccurrences = (token, allData) => {
   if (!token?.segments?.stem || !Array.isArray(allData)) return [];
-
   const anchorStem = token.segments.stem;
-
-  // Exact match only: compare QAC's own segments.stem
   return allData.filter(entry =>
     entry.segments?.stem === anchorStem
   );
 };
 
-/**
- * Basic derivative check — adjust as needed for your definition of "derivative".
- */
 const isMorphDerivative = (candidateStem, anchorStem) => {
   if (!candidateStem || !anchorStem) return false;
-  // Example: match if the candidate contains the anchor or vice versa
   return candidateStem.includes(anchorStem) || anchorStem.includes(candidateStem);
 };
 
-// Export all functions
 export default {
   normalizeArabic,
   stemArabic,
+  stripPrefixes,
   loadQACData,
   analyzeEntry,
   getVerseLocation,
