@@ -40,7 +40,10 @@ function highlightStemOrRoot(text, entry) {
   if (rootNorm && rootNorm !== stemNorm) parts.push(rootNorm);
 
   const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp('(' + parts.map(escapeRegex).join('|') + ')' + '[\\u064B-\\u065F\\u0670\\u0640]*', 'g');
+  const pattern = new RegExp(
+    '(' + parts.map(escapeRegex).join('|') + ')' + '[\u064B-\u065F\u0670\u0640]*',
+    'g'
+  );
 
   return verseNorm.replace(pattern, (match) => `<span class="hl-stem">${match}</span>`);
 }
@@ -70,20 +73,22 @@ export default function App() {
         const [data] = await Promise.all([loadQACData(), loadQuranText()]);
         const array = coerceQacArray(data);
 
-        // Minimal normalization so UI/search never crash on missing segments
-        const normalized = array.map((e) => ({
-          ...e,
-          segments: e?.segments ?? {
-            prefixes: [],
-            stem: e?.stem ?? '',
-            suffixes: []
-          }
-        }));
+        // Pre-normalize all entries for consistent search/display
+        const normalized = array.map((e) => {
+          const formArabic = buckwalterToArabic(e?.form ?? e?.word ?? '');
+          const stemArabicStr = buckwalterToArabic(e?.segments?.stem ?? e?.stem ?? '');
+
+          return {
+            ...e,
+            formArabic,
+            normalizedForm: normalizeArabicFromLoader(stripPrefixes(formArabic)),
+            segments: e?.segments ?? { prefixes: [], stem: stemArabicStr, suffixes: [] },
+            normalizedStem: normalizeArabicFromLoader(stripPrefixes(stemArabicStr))
+          };
+        });
 
         setQacData(normalized);
-        // Tiny visibility: lets you check length in DevTools without extra UI
-        window.__QAC_LEN__ = normalized.length;
-        // console.info('QAC tokens loaded:', normalized.length);
+        window.__QAC_LEN__ = normalized.length; // optional dev check
       } catch (err) {
         setError(`فشل تحميل البيانات: ${err?.message || String(err)}`);
       } finally {
@@ -100,37 +105,23 @@ export default function App() {
       return;
     }
 
-    // Strip known prefixes and normalize
-    const stripped = stripPrefixes(raw);
-    const term = normalizeArabicFromLoader(stripped);
+    const term = normalizeArabicFromLoader(stripPrefixes(raw));
     if (!term) {
       setResults([]);
       return;
     }
 
-    // First try exact token match (normalized form)
-    let matchedEntry =
-      qacData.find((e) => {
-        const form = e?.form ?? e?.word ?? '';
-        return form && normalizeArabicFromLoader(form) === term;
-      }) || null;
+    // First try exact normalized form
+    let matchedEntry = qacData.find((e) => e.normalizedForm === term) || null;
 
-    // Then try stem anchor
+    // Then try normalized stem
     if (!matchedEntry) {
-      const inputStem = stemArabic(term);
-      matchedEntry =
-        qacData.find((e) => {
-          const tokenStem = e?.segments?.stem ?? e?.stem ?? null;
-          return tokenStem && tokenStem === inputStem;
-        }) || null;
+      matchedEntry = qacData.find((e) => e.normalizedStem === term) || null;
     }
 
     let occurrences = [];
-
     if (matchedEntry) {
       occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
-
-      // Verb root expansion
       if (matchedEntry.tag === 'V' && matchedEntry.root) {
         const sameRootVerbs = qacData.filter(
           (e) => e.tag === 'V' && e.root === matchedEntry.root
@@ -138,13 +129,10 @@ export default function App() {
         occurrences = occurrences.concat(sameRootVerbs);
       }
     } else {
-      // Fallback: direct scan for matching normalized form or stem
-      const inputStem = stemArabic(term);
-      const directMatches = qacData.filter((e) => {
-        const formNorm = normalizeArabicFromLoader(e?.form ?? e?.word ?? '');
-        const stemVal = e?.segments?.stem ?? e?.stem ?? '';
-        return formNorm === term || stemVal === inputStem;
-      });
+      // Fallback: scan both normalizedForm and normalizedStem
+      const directMatches = qacData.filter(
+        (e) => e.normalizedForm === term || e.normalizedStem === term
+      );
       occurrences = directMatches;
     }
 
@@ -203,27 +191,20 @@ export default function App() {
       </div>
 
       {loading ? (
-        <div className="status" dir="rtl" lang="ar">
-          جارٍ تحميل بيانات المتن...
-        </div>
+        <div className="status" dir="rtl" lang="ar"> جارٍ تحميل بيانات المتن... </div>
       ) : error ? (
-        <div className="error" dir="rtl" lang="ar">
-          {error}
-        </div>
+        <div className="error" dir="rtl" lang="ar">{error}</div>
       ) : results.length > 0 ? (
         <div className="results">
           <h2 dir="rtl" lang="ar">تم العثور على {results.length} نتيجة</h2>
           <div className="results-grid">
             {results.map((entry, idx) => {
-              const isOpen =
-                openReference &&
+              const isOpen = openReference &&
                 openReference.sura === entry.sura &&
                 openReference.verse === entry.verse;
-
               const verseHTML = isOpen
                 ? highlightStemOrRoot(openReference.text, entry)
                 : null;
-
               return (
                 <div key={idx} className="entry-card">
                   <div className="token-display">
@@ -242,24 +223,17 @@ export default function App() {
                     )}
                   </div>
 
-                  <div
-                    className="arabic"
-                    dir="rtl"
-                    lang="ar"
+                  <div className="arabic" dir="rtl" lang="ar"
                     dangerouslySetInnerHTML={{
-                      __html: highlightStemOrRoot(
-                        buckwalterToArabic(entry.form),
-                        entry
-                      )
-                    }}
-                  />
+                      __html: highlightStemOrRoot(buckwalterToArabic(entry.form), entry)
+                    }} />
 
                   <div className="details" dir="rtl" lang="ar">
                     <p>
                       <strong>الجذر:</strong>{' '}
                       <span
                         dangerouslySetInnerHTML={{
-                          __html: highlightStemOrRoot(
+                          __html:highlightStemOrRoot(
                             buckwalterToArabic(entry.root || ''),
                             entry
                           )
