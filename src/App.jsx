@@ -258,15 +258,37 @@ export default function App() {
                     </p>
 
                     {/* Suffixes */}
-                    {entry.segments?.suffixes?.length > 0 && (
-                      <p>اللواحق:{' '}
-                        <span dangerouslySetInnerHTML={{
-                          __html: highlightStemOrRoot(
-                            entry.segments.suffixes.map(buckwalterToArabic).join(' + '),
-                            entry
-                          )
-                       }}
+{entry.segments?.suffixes?.length > 0 && (
+  <p>اللواحق:{' '}
+    <span
+      dangerouslySetInnerHTML={{
+        __html: highlightStemOrRoot(
+          entry.segments.suffixes.map(buckwalterToArabic).join(' + '),
+          entry
+        )
+      }}
     />
+ && (
+  <div
+    className="verse-inline"
+    dir="rtl"
+    lang="ar"
+    dangerouslySetInnerHTML={{ __html: verseHTML }}
   </p>
 )}
 
+{isOpen  />
+)}
+</div> {/* closes .details */}
+</div> {/* closes .entry-card */}
+))} {/* closes results.map */}
+</div> {/* closes .results-grid */}
+</div> {/* closes .results */}
+) : (
+  <div" dir="rtl" lang className="status="ar">
+    {searchTerm ? 'لم يتم العثور على نتائج' : 'أدخل كلمة للبحث'}
+  </div>
+)}
+</div> {/* closes .app */}
+);
+}
