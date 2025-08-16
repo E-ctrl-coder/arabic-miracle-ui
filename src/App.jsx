@@ -256,20 +256,39 @@ export default function App() {
                         )
                       }} />
                     </p>
-  {/* Suffixes */}
-  {entry.segments?.suffixes?.length > 0 && (
-    <p>اللواحق:{' '}
-      <span
-        dangerouslySetInnerHTML={{
-          __html: highlightStemOrRoot(
-            entry.segments.suffixes
-              .map(buckwalterToArabic)
-              .join(' + '),
-            entry
-          )
-        }}
-      />
-    </p>
-  )}
+                     {/* Suffixes */}
+                    {entry.segments?.suffixes?.length > 0 && (
+                      <p>اللواحق:{' '}
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: highlightStemOrRoot(
+                              entry.segments.suffixes
+                                .map(buckwalterToArabic)
+                                .join(' + '),
+                              entry
+                            )
+                          }}
+                        />
+                      </p>
+                    )}
+                  </div> {/* closes .details */}
 
-</div>
+                  {isOpen && verseHTML && (
+                    <div
+                      className="verse-text"
+                      dir="rtl"
+                      lang="ar"
+                      dangerouslySetInnerHTML={{ __html: verseHTML }}
+                    />
+                  )}
+                </div> {/* closes .entry-card */}
+              );
+            })}
+          </div> {/* closes .results-grid */}
+        </div> {/* closes .results */}
+      ) : (
+        <div className="status" dir="rtl" lang="ar">لا توجد نتائج</div>
+      )}
+    </div> {/* closes .app */}
+  );
+}
