@@ -3,13 +3,13 @@ import {
   loadQACData,
   loadQuranText,
   getVerseText as getVerseTextFromLoader,
-  normalizeArabic as normalizeArabicFromLoader, // keep original loader fn name separate
+  normalizeArabic as normalizeArabicFromLoader,
   stemArabic,
   findStemFamilyOccurrences,
-  stripPrefixes // ← NEW
+  stripPrefixes
 } from './loader/qacJsonLoader';
 import buckwalterToArabic from './utils/buckwalterToArabic';
-import normalizeArabic from './utils/normalizeArabic'; // ← existing stricter matcher
+import normalizeArabic from './utils/normalizeArabic';
 import './styles.css';
 
 const posMap = {
@@ -28,7 +28,6 @@ const posMap = {
   INTERJ: 'أداة تعجب',
 };
 
-// Updated: normalize both verse text and patterns
 function highlightStemOrRoot(text, entry) {
   if (!text || !entry) return text;
   const verseNorm = normalizeArabic(text);
@@ -39,19 +38,15 @@ function highlightStemOrRoot(text, entry) {
     buckwalterToArabic(entry.root || '')
   );
   if (!stemNorm && !rootNorm) return text;
-
   const parts = [];
   if (stemNorm) parts.push(stemNorm);
   if (rootNorm && rootNorm !== stemNorm) parts.push(rootNorm);
-
-  const escapeRegex = (s) =>
-    s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(
     '(' + parts.map(escapeRegex).join('|') + ')' +
-      '[\\u064B-\\u065F\\u0670\\u0640]*',
+    '[\u064B-\u065F\u0670\u0640]*',
     'g'
   );
-
   return verseNorm.replace(pattern, (match) => {
     return `<span class="hl-stem">${match}</span>`;
   });
@@ -89,20 +84,18 @@ export default function App() {
       return;
     }
 
-    // NEW: strip known proclitics/conjunctions before normalising
+    // Strip known prefixes and normalize
     const stripped = stripPrefixes(raw);
-
     const term = normalizeArabicFromLoader(stripped);
     if (!term) {
       setResults([]);
       return;
     }
 
-    let matchedEntry =
-      qacData.find((e) => {
-        const form = e?.form ?? e?.word ?? '';
-        return form && normalizeArabicFromLoader(form) === term;
-      }) || null;
+    let matchedEntry = qacData.find((e) => {
+      const form = e?.form ?? e?.word ?? '';
+      return form && normalizeArabicFromLoader(form) === term;
+    }) || null;
 
     if (!matchedEntry) {
       const inputStem = stemArabic(term);
@@ -112,33 +105,38 @@ export default function App() {
       }) || null;
     }
 
-    if (!matchedEntry) {
-      setResults([]);
-      return;
+    let occurrences = [];
+    if (matchedEntry) {
+      occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
+
+      // Verb root expansion
+      if (matchedEntry.tag === 'V' && matchedEntry.root) {
+        const sameRootVerbs = qacData.filter(
+          (e) => e.tag === 'V' && e.root === matchedEntry.root
+        );
+        occurrences = occurrences.concat(sameRootVerbs);
+      }
+    } else {
+      // NEW: Fallback direct scan if nothing matched
+      const inputStem = stemArabic(term);
+      const directMatches = qacData.filter((e) => {
+        const formNorm = normalizeArabicFromLoader(e?.form ?? e?.word ?? '');
+        const stemVal = e?.segments?.stem ?? e?.stem ?? '';
+        return formNorm === term || stemVal === inputStem;
+      });
+      occurrences = directMatches;
     }
 
-    const occurrences =
-      findStemFamilyOccurrences(matchedEntry, qacData) || [];
-    let expandedOccurrences = [...occurrences];
-
-    if (matchedEntry.tag === 'V' && matchedEntry.root) {
-      const sameRootVerbs = qacData.filter(
-        (e) => e.tag === 'V' && e.root === matchedEntry.root
-      );
-      expandedOccurrences =
-        expandedOccurrences.concat(sameRootVerbs);
-    }
-
+    // Deduplicate and sort
     const seen = new Set();
     const unique = [];
-    for (const entry of expandedOccurrences) {
+    for (const entry of occurrences) {
       const key = `${entry.form}-${entry.location}`;
       if (!seen.has(key)) {
         seen.add(key);
         unique.push(entry);
       }
     }
-
     unique.sort((a, b) => {
       const sa = Number(a.sura), sb = Number(b.sura);
       if (sa !== sb) return sa - sb;
@@ -207,7 +205,6 @@ export default function App() {
                 : null;
               return (
                 <div key={idx} className="entry-card">
-                  {/* Token display block */}
                   <div className="token-display">
                     {entry.segments.prefixes.length > 0 && (
                       <span className="prefix">
