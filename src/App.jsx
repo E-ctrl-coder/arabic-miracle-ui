@@ -26,15 +26,16 @@ const posMap = {
   INTERJ: 'أداة تعجب',
 };
 
-// Highlight helper — works for any Arabic string
-function highlightStemOrRoot(text, entry) {
-  if (!text || !entry) return text;
+// Updated helper: highlights both stem and root anywhere in the verse
+function highlightTokenStemInVerse(verse, entry) {
+  if (!verse || !entry) return verse;
 
   const strip = s => s?.replace(/[\u064B-\u065F\u0670\u0640]/g, '') || '';
+
   const stem = strip(entry.segments?.stem || '');
   const root = strip(entry.root || '');
 
-  if (!stem && !root) return text;
+  if (!stem && !root) return verse;
 
   const patternParts = [];
   if (stem) patternParts.push(stem);
@@ -43,12 +44,14 @@ function highlightStemOrRoot(text, entry) {
   const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   const pattern = new RegExp(
-    '(' + patternParts.map(escapeRegex).join('|') + ')' +
-    '[\u064B-\u065F\u0670\u0640]*',
+    '(' +
+      patternParts.map(escapeRegex).join('|') +
+      ')' +
+      '[\u064B-\u065F\u0670\u0640]*', // trailing diacritics allowed
     'g'
   );
 
-  return text.replace(pattern, match => `<span class="hl-stem">${match}</span>`);
+  return verse.replace(pattern, match => `<span class="hl-stem">${match}</span>`);
 }
 
 export default function App() {
@@ -182,51 +185,19 @@ export default function App() {
               const isOpen = openReference &&
                              openReference.sura === entry.sura &&
                              openReference.verse === entry.verse;
-
               const verseHTML = isOpen
-                ? highlightStemOrRoot(openReference.text, entry)
+                ? highlightTokenStemInVerse(openReference.text, entry)
                 : null;
 
               return (
                 <div key={idx} className="entry-card">
-                  {/* Main word */}
-                  <div
-                    className="arabic"
-                    dir="rtl"
-                    lang="ar"
-                    dangerouslySetInnerHTML={{
-                      __html: highlightStemOrRoot(
-                        buckwalterToArabic(entry.form),
-                        entry
-                      )
-                    }}
-                  />
-
+                  <div className="arabic" dir="rtl" lang="ar">
+                    {buckwalterToArabic(entry.form)}
+                  </div>
                   <div className="details" dir="rtl" lang="ar">
-                    {/* Root */}
-                    <p><strong>الجذر:</strong>{' '}
-                      <span dangerouslySetInnerHTML={{
-                        __html: highlightStemOrRoot(
-                          buckwalterToArabic(entry.root),
-                          entry
-                        )
-                      }} />
-                    </p>
-
-                    {/* Lemma */}
-                    <p><strong>اللفظة:</strong>{' '}
-                      <span dangerouslySetInnerHTML={{
-                        __html: highlightStemOrRoot(
-                          buckwalterToArabic(entry.lemma),
-                          entry
-                        )
-                      }} />
-                    </p>
-
-                    {/* POS */}
+                    <p><strong>الجذر:</strong> {buckwalterToArabic(entry.root)}</p>
+                    <p><strong>اللفظة:</strong> {buckwalterToArabic(entry.lemma)}</p>
                     <p><strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}</p>
-
-                    {/* Location */}
                     <p
                       className="location"
                       style={{ color: 'blue', cursor: 'pointer' }}
@@ -234,61 +205,32 @@ export default function App() {
                     >
                       سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
                     </p>
-
-                    {/* Prefixes */}
                     {entry.segments?.prefixes?.length > 0 && (
-                      <p>السوابق:{' '}
-                        <span dangerouslySetInnerHTML={{
-                          __html: highlightStemOrRoot(
-                            entry.segments.prefixes.map(buckwalterToArabic).join(' + '),
-                            entry
-                          )
-                        }} />
-                      </p>
+                      <p>السوابق: {entry.segments.prefixes.map(buckwalterToArabic).join(' + ')}</p>
                     )}
-
-                    {/* Stem */}
-                    <p>الجذر الصرفي:{' '}
-                      <span dangerouslySetInnerHTML={{
-                        __html: highlightStemOrRoot(
-                          buckwalterToArabic(entry.segments?.stem || ''),
-                          entry
-                        )
-                      }} />
-                    </p>
-                     {/* Suffixes */}
+                    <p>الجذر الصرفي: {buckwalterToArabic(entry.segments?.stem || '')}</p>
                     {entry.segments?.suffixes?.length > 0 && (
-                      <p>اللواحق:{' '}
-                        <span
-                          dangerouslySetInnerHTML={{
-                            __html: highlightStemOrRoot(
-                              entry.segments.suffixes
-                                .map(buckwalterToArabic)
-                                .join(' + '),
-                              entry
-                            )
-                          }}
-                        />
-                      </p>
+                      <p>اللواحق: {entry.segments.suffixes.map(buckwalterToArabic).join(' + ')}</p>
                     )}
-                  </div> {/* closes .details */}
-
-                  {isOpen && verseHTML && (
-                    <div
-                      className="verse-text"
-                      dir="rtl"
-                      lang="ar"
-                      dangerouslySetInnerHTML={{ __html: verseHTML }}
-                    />
-                  )}
-                </div> {/* closes .entry-card */}
+                    {isOpen && (
+                      <div
+                        className="verse-inline"
+                        dir="rtl"
+                        lang="ar"
+                        dangerouslySetInnerHTML={{ __html: verseHTML }}
+                      />
+                    )}
+                  </div>
+                </div>
               );
             })}
-          </div> {/* closes .results-grid */}
-        </div> {/* closes .results */}
+          </div>
+        </div>
       ) : (
-        <div className="status" dir="rtl" lang="ar">لا توجد نتائج</div>
+        <div className="status" dir="rtl" lang="ar">
+          {searchTerm ? 'لم يتم العثور على نتائج' : 'أدخل كلمة للبحث'}
+        </div>
       )}
-    </div> {/* closes .app */}
+    </div>
   );
 }
