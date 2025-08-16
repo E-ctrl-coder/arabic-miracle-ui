@@ -3,11 +3,12 @@ import {
   loadQACData,
   loadQuranText,
   getVerseText as getVerseTextFromLoader,
-  normalizeArabic,
+  normalizeArabic as normalizeArabicFromLoader, // keep original loader fn name separate
   stemArabic,
   findStemFamilyOccurrences
 } from './loader/qacJsonLoader';
 import buckwalterToArabic from './utils/buckwalterToArabic';
+import normalizeArabic from './utils/normalizeArabic'; // ← NEW import for our stricter matcher
 import './styles.css';
 
 const posMap = {
@@ -26,28 +27,38 @@ const posMap = {
   INTERJ: 'أداة تعجب',
 };
 
-// Highlight any Arabic string by wrapping matches of stem/root (with trailing diacritics) in <span class="hl-stem">
+// Updated: normalize both verse text and patterns
 function highlightStemOrRoot(text, entry) {
   if (!text || !entry) return text;
 
-  const strip = (s) => s?.replace(/[\u064B-\u065F\u0670\u0640]/g, '') || '';
-  const stem = strip(entry.segments?.stem || '');
-  const root = strip(entry.root || '');
+  // Normalise the verse text
+  const verseNorm = normalizeArabic(text);
 
-  if (!stem && !root) return text;
+  // Convert and normalise stem/root from entry
+  const stemNorm = normalizeArabic(
+    buckwalterToArabic(entry.segments?.stem || '')
+  );
+  const rootNorm = normalizeArabic(
+    buckwalterToArabic(entry.root || '')
+  );
+
+  if (!stemNorm && !rootNorm) return text;
 
   const parts = [];
-  if (stem) parts.push(stem);
-  if (root && root !== stem) parts.push(root);
+  if (stemNorm) parts.push(stemNorm);
+  if (rootNorm && rootNorm !== stemNorm) parts.push(rootNorm);
 
   const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
   const pattern = new RegExp(
     '(' + parts.map(escapeRegex).join('|') + ')' + '[\u064B-\u065F\u0670\u0640]*',
     'g'
   );
 
-  return text.replace(pattern, (match) => `<span class="hl-stem">${match}</span>`);
+  // Apply highlighting to the normalised verse text, but preserve matched chars from original
+  let i = 0;
+  return verseNorm.replace(pattern, (match) => {
+    return `<span class="hl-stem">${match}</span>`;
+  });
 }
 
 export default function App() {
@@ -58,7 +69,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load data once at start
   useEffect(() => {
     async function initialize() {
       try {
@@ -76,7 +86,6 @@ export default function App() {
     initialize();
   }, []);
 
-  // Search and expansion logic
   const handleSearch = () => {
     const raw = searchTerm.trim();
     if (!raw || loading) {
@@ -84,20 +93,18 @@ export default function App() {
       return;
     }
 
-    const term = normalizeArabic(raw);
+    const term = normalizeArabicFromLoader(raw);
     if (!term) {
       setResults([]);
       return;
     }
 
-    // 1) Exact form match (normalized)
     let matchedEntry =
       qacData.find((e) => {
         const form = e?.form ?? e?.word ?? '';
-        return form && normalizeArabic(form) === term;
+        return form && normalizeArabicFromLoader(form) === term;
       }) || null;
 
-    // 2) Fallback by stem match
     if (!matchedEntry) {
       const inputStem = stemArabic(term);
       matchedEntry = qacData.find((e) => {
@@ -111,11 +118,9 @@ export default function App() {
       return;
     }
 
-    // Base occurrences from stem family
     const occurrences = findStemFamilyOccurrences(matchedEntry, qacData) || [];
     let expandedOccurrences = [...occurrences];
 
-    // If the matched token is a verb with a root, include all verbs of the same root
     if (matchedEntry.tag === 'V' && matchedEntry.root) {
       const sameRootVerbs = qacData.filter(
         (e) => e.tag === 'V' && e.root === matchedEntry.root
@@ -123,7 +128,6 @@ export default function App() {
       expandedOccurrences = expandedOccurrences.concat(sameRootVerbs);
     }
 
-    // Deduplicate
     const seen = new Set();
     const unique = [];
     for (const entry of expandedOccurrences) {
@@ -134,7 +138,6 @@ export default function App() {
       }
     }
 
-    // Sort by sura, verse, word number
     unique.sort((a, b) => {
       const sa = Number(a.sura), sb = Number(b.sura);
       if (sa !== sb) return sa - sb;
@@ -148,7 +151,6 @@ export default function App() {
     setOpenReference(null);
   };
 
-  // Toggle verse expansion and load verse text
   const handleVerseClick = (sura, verse) => {
     if (openReference && openReference.sura === sura && openReference.verse === verse) {
       setOpenReference(null);
@@ -198,7 +200,6 @@ export default function App() {
 
               return (
                 <div key={idx} className="entry-card">
-                  {/* Main word */}
                   <div
                     className="arabic"
                     dir="rtl"
@@ -212,7 +213,6 @@ export default function App() {
                   />
 
                   <div className="details" dir="rtl" lang="ar">
-                    {/* Root */}
                     <p><strong>الجذر:</strong>{' '}
                       <span
                         dangerouslySetInnerHTML={{
@@ -224,7 +224,6 @@ export default function App() {
                       />
                     </p>
 
-                    {/* Lemma */}
                     <p><strong>اللفظة:</strong>{' '}
                       <span
                         dangerouslySetInnerHTML={{
@@ -236,10 +235,8 @@ export default function App() {
                       />
                     </p>
 
-                    {/* POS */}
                     <p><strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}</p>
 
-                    {/* Location (click to toggle verse) */}
                     <p
                       className="location"
                       style={{ color: 'blue', cursor: 'pointer' }}
@@ -248,7 +245,6 @@ export default function App() {
                       سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
                     </p>
 
-                    {/* Prefixes */}
                     {entry.segments?.prefixes?.length > 0 && (
                       <p>
                         السوابق:{' '}
@@ -265,7 +261,6 @@ export default function App() {
                       </p>
                     )}
 
-                    {/* Stem */}
                     <p>
                       الجذر الصرفي:{' '}
                       <span
