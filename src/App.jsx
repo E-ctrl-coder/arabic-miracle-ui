@@ -161,5 +161,230 @@ export default function App() {
         return formNorm === term || stemVal === inputStem;
       });
       occurrences = directMatches;
+      // ---------- Fuzzy fallback ----------
+      if (occurrences.length === 0) {
+        const normTerm = term;
+        const fuzzyHits = [];
+        for (const entry of qacData) {
+          const root = normalizeArabicFromLoader(
+            buckwalterToArabic(entry.root || '')
+          );
+          const stem = normalizeArabicFromLoader(
+            buckwalterToArabic(entry.segments?.stem || '')
+          );
+          for (const candidate of [root, stem]) {
+            if (candidate.length < 3) continue;
+            for (let i = 0; i <= candidate.length - 3; i++) {
+              const trigram = candidate.slice(i, i + 3);
+              if (
+                normTerm.includes(trigram) &&
+                onlyAffixes(normTerm, trigram)
+              ) {
+                fuzzyHits.push(entry);
+                break;
+              }
+            }
+          }
+        }
+        occurrences = fuzzyHits;
+      }
+    }
+
+    const seen = new Set();
+    const unique = [];
+    for (const entry of occurrences) {
+      const key = `${entry.form}-${entry.location ?? `${entry.sura}:${entry.verse}:${entry.wordNum}`}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(entry);
+      }
+    }
+    unique.sort((a, b) => {
+      const sa = Number(a.sura), sb = Number(b.sura);
+      if (sa !== sb) return sa - sb;
+      const va = Number(a.verse), vb = Number(b.verse);
+      if (va !== vb) return va - vb;
+      const wa = Number(a.wordNum), wb = Number(b.wordNum);
+      return wa - wb;
+    });
+    setResults(unique);
+    setOpenReference(null);
+  };
+
+  const handleVerseClick = (sura, verse) => {
+    if (openReference && openReference.sura === sura && openReference.verse === verse) {
+      setOpenReference(null);
+      return;
+    }
+    setOpenReference({
+      sura,
+      verse,
+      text: getVerseTextFromLoader(String(sura), String(verse)) || ''
+    });
+  };
+
+  return (
+    <div className="app">
+      <h1>المحلل الصرفي للقرآن الكريم</h1>
+      <div className="search-box">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="أدخل كلمة عربية"
+          dir="rtl"
+          lang="ar"
+          id="qac-term"
+          name="qac-term"
+        />
+        <button onClick={handleSearch}>ابحث</button>
+      </div>
+
+      {loading ? (
+        <div className="status" dir="rtl" lang="ar">
+          جارٍ تحميل بيانات المتن...
+        </div>
+      ) : error ? (
+        <div className="error" dir="rtl" lang="ar">
+          {error}
+        </div>
+      ) : results.length > 0 ? (
+        <div className="results">
+          <h2 dir="rtl" lang="ar">تم العثور على {results.length} نتيجة</h2>
+          <div className="results-grid">
+            {results.map((entry, idx) => {
+              const isOpen =
+                openReference &&
+                openReference.sura === entry.sura &&
+                openReference.verse === entry.verse;
+              const verseHTML = isOpen
+                ? highlightStemOrRoot(openReference.text, entry)
+                : null;
+              return (
+                <div key={idx} className="entry-card">
+                  <div className="token-display">
+                    {entry?.segments?.prefixes?.length > 0 && (
+                      <span className="prefix">
+                        {entry.segments.prefixes.map(buckwalterToArabic).join('')}
+                      </span>
+                    )}
+                    <span className="hl-stem">
+                      {buckwalterToArabic(entry?.segments?.stem || '')}
+                    </span>
+                    {entry?.segments?.suffixes?.length > 0 && (
+                      <span className="suffix">
+                        {entry.segments.suffixes.map(buckwalterToArabic).join('')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className="arabic"
+                    dir="rtl"
+                    lang="ar"
+                    dangerouslySetInnerHTML={{
+                      __html: highlightStemOrRoot(
+                        buckwalterToArabic(entry.form),
+                        entry
+                      )
+                    }}
+                  />
+
+                  <div className="details" dir="rtl" lang="ar">
+                    <p>
+                      <strong>الجذر:</strong>{' '}
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: highlightStemOrRoot(
+                            buckwalterToArabic(entry.root || ''),
+                            entry
+                          )
+                        }}
+                      />
+                    </p>
+                    <p>
+                      <strong>اللفظة:</strong>{' '}
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: highlightStemOrRoot(
+                            buckwalterToArabic(entry.lemma || ''),
+                            entry
+                          )
+                        }}
+                      />
+                    </p>
+                    <p>
+                      <strong>نوع الكلمة:</strong> {posMap[entry.tag] || entry.tag}
+                    </p>
+                    <p
+                      className="location"
+                      style={{ color: 'blue', cursor: 'pointer' }}
+                      onClick={() => handleVerseClick(entry.sura, entry.verse)}
+                    >
+                      سورة {entry.sura}، آية {entry.verse} (الكلمة {entry.wordNum})
+                    </p>
+
+                    {entry?.segments?.prefixes?.length > 0 && (
+                      <p>
+                        السوابق:{' '}
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: highlightStemOrRoot(
+                              entry.segments.prefixes.map(buckwalterToArabic).join(' + '),
+                              entry
+                            )
+                          }}
+                        />
+                      </p>
+                    )}
+
+                    <p>
+                      الجذر الصرفي:{' '}
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: highlightStemOrRoot(
+                            buckwalterToArabic(entry?.segments?.stem || ''),
+                            entry
+                          )
+                        }}
+                      />
+                    </p>
+
+                    {entry?.segments?.suffixes?.length > 0 && (
+                      <p>
+                        اللواحق:{' '}
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: highlightStemOrRoot(
+                              entry.segments.suffixes.map(buckwalterToArabic).join(' + '),
+                              entry
+                            )
+                          }}
+                        />
+                      </p>
+                    )}
+                  </div>
+
+                  {isOpen && verseHTML && (
+                    <div
+                      className="verse-text"
+                      dir="rtl"
+                      lang="ar"
+                      dangerouslySetInnerHTML={{ __html: verseHTML }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="status" dir="rtl" lang="ar">
+          {searchTerm ? 'لم يتم العثور على نتائج' : 'أدخل كلمة للبحث'}
+        </div>
+      )}
+    </div>
+  );
 
      
