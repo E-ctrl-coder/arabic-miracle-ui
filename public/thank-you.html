@@ -6,28 +6,42 @@
   <style>
     body { 
       font-family: system-ui, sans-serif; 
-      max-width: 600px; 
-      margin: 3rem auto; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      height: 100vh; 
       background: #f9f9f9; 
+      margin: 0; 
+    }
+    .box {
+      background: #fff; 
       padding: 2rem; 
       border-radius: 8px; 
-      text-align: center; 
       box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+      text-align: center; 
+      max-width: 400px;
     }
-    h1 { color: #28a745; }
-    p { color: #555; font-size: 1.1rem; }
+    .icon {
+      font-size: 3rem; 
+      color: #28a745; 
+    }
+    h1 { color: #28a745; margin-top: 1rem; }
+    p { color: #555; margin-top: 0.5rem; }
     a { 
       display: inline-block; 
-      margin-top: 2rem; 
-      text-decoration: none; 
+      margin-top: 1.5rem; 
       color: #007bff; 
+      text-decoration: none; 
     }
     a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <h1>✅ Thank you!</h1>
-  <p>Your message has been received successfully. We’ll get back to you as soon as possible.</p>
-  <a href="/contact.html">Back to Contact Page</a>
+  <div class="box">
+    <div class="icon">✔</div>
+    <h1>Thank you!</h1>
+    <p>Your message has been received successfully. We'll get back to you as soon as possible.</p>
+    <a href="/">Back to Home Page</a>
+  </div>
 </body>
 </html>
