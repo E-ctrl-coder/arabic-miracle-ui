@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Contact Test</title>
+  <title>Contact Us</title>
   <style>
     body { font-family: sans-serif; max-width: 500px; margin: 3rem auto; }
     label { display: block; margin: 1rem 0 0.5rem; }
@@ -11,10 +11,13 @@
   </style>
 </head>
 <body>
-  <h1>Contact Test Page</h1>
-  <form action="/thank-you.html" method="get">
+  <h1>Contact Us</h1>
+  <form action="/thank-you.html" method="post">
     <label for="name">Name:</label>
     <input id="name" name="name" required />
+
+    <label for="email">Email:</label>
+    <input type="email" id="email" name="email" required />
 
     <label for="message">Message:</label>
     <textarea id="message" name="message" rows="4" required></textarea>
