@@ -1,5 +1,3 @@
-# netlify.toml
-
 [build]
   command = "npm run build"
   publish = "dist"
@@ -10,7 +8,34 @@
   status = 200
   force  = true
 
+# ✅ Allow direct access to static pages
 [[redirects]]
-  from   = "/*"
-  to     = "/index.html"
+  from = "/about.html"
+  to   = "/about.html"
+  status = 200
+
+[[redirects]]
+  from = "/ads.html"
+  to   = "/ads.html"
+  status = 200
+
+[[redirects]]
+  from = "/contact.html"
+  to   = "/contact.html"
+  status = 200
+
+[[redirects]]
+  from = "/instructions.html"
+  to   = "/instructions.html"
+  status = 200
+
+[[redirects]]
+  from = "/links.html"
+  to   = "/links.html"
+  status = 200
+
+# ✅ SPA fallback for everything else
+[[redirects]]
+  from = "/*"
+  to   = "/index.html"
   status = 200
