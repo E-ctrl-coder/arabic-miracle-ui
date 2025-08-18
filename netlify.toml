@@ -34,6 +34,11 @@
   to   = "/links.html"
   status = 200
 
+[[redirects]]
+  from = "/thank-you.html"
+  to   = "/thank-you.html"
+  status = 200
+
 # ✅ SPA fallback for everything else
 [[redirects]]
   from = "/*"
