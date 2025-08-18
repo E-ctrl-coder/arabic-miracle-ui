@@ -38,7 +38,9 @@
 </head>
 <body>
   <h1>Contact Us</h1>
-  <form action="/thank-you.html" method="post">
+
+  <!-- Netlify form with direct action to thank-you.html -->
+  <form name="contact" method="POST" action="/thank-you.html" data-netlify="true">
     <label for="name">Name</label>
     <input id="name" name="name" required />
 
@@ -50,5 +52,6 @@
 
     <button type="submit">Send Message</button>
   </form>
+
 </body>
 </html>
