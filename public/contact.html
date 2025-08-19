@@ -1,57 +1,179 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>Contact Us</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>اتصل بنا</title>
   <style>
-    body { 
-      font-family: system-ui, sans-serif; 
-      max-width: 600px; 
-      margin: 3rem auto; 
-      background: #f9f9f9; 
-      padding: 2rem; 
-      border-radius: 8px; 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+    :root {
+      --bg: #f9f9f9;
+      --card: #ffffff;
+      --text: #222;
+      --muted: #666;
+      --accent: #0d6efd;
+      --success: #28a745;
+      --border: #e5e7eb;
     }
-    h1 { text-align: center; color: #333; }
-    label { display: block; margin-top: 1.5rem; color: #555; font-weight: bold; }
-    input, textarea { 
-      width: 100%; 
-      padding: 0.6rem; 
-      margin-top: 0.4rem; 
-      border: 1px solid #ccc; 
-      border-radius: 4px; 
-      font-size: 1rem; 
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Naskh Arabic", "Noto Sans Arabic", "Helvetica Neue", Arial, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+      line-height: 1.6;
     }
-    button { 
-      margin-top: 1.5rem; 
-      padding: 0.7rem 1.2rem; 
-      border: none; 
-      background-color: #28a745; 
-      color: white; 
-      border-radius: 4px; 
-      font-size: 1rem; 
-      cursor: pointer; 
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
-    button:hover { background-color: #218838; }
+    .nav {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .nav a:hover { background: #f2f2f2; }
+    .nav .brand {
+      font-weight: 700;
+      color: var(--accent);
+      margin-inline-end: 0.5rem;
+    }
+    main {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+      padding: 1.25rem;
+    }
+    h1 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.6rem;
+    }
+    p.lead {
+      margin: 0 0 1.25rem 0;
+      color: var(--muted);
+    }
+    form {
+      display: grid;
+      gap: 1rem;
+    }
+    label {
+      font-weight: 600;
+      color: var(--text);
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 1rem;
+      color: var(--text);
+      box-sizing: border-box;
+    }
+    input:focus, textarea:focus {
+      outline: 2px solid color-mix(in oklab, var(--accent) 40%, white);
+      border-color: var(--accent);
+    }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    button[type="submit"] {
+      background: var(--success);
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.1rem;
+      font-size: 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button[type="submit"]:hover { filter: brightness(0.96); }
+    .hint { color: var(--muted); font-size: 0.95rem; }
+    footer {
+      max-width: 900px;
+      margin: 2rem auto 3rem;
+      color: var(--muted);
+      padding: 0 1rem;
+      font-size: 0.95rem;
+    }
   </style>
 </head>
 <body>
-  <h1>Contact Us</h1>
+  <header>
+    <nav class="nav" aria-label="التنقل">
+      <a class="brand" href="/">محلل صرفي</a>
+      <a href="/">الرئيسية</a>
+      <a href="/contact.html" aria-current="page">اتصل بنا</a>
+    </nav>
+  </header>
 
-  <!-- Netlify form with direct action to thank-you.html -->
-  <form name="contact" method="POST" action="/thank-you.html" data-netlify="true">
-    <label for="name">Name</label>
-    <input id="name" name="name" required />
+  <main>
+    <section class="card" aria-labelledby="contact-title">
+      <h1 id="contact-title">اتصل بنا</h1>
+      <p class="lead">يسعدنا تواصلك. رجاءً املأ الحقول أدناه ثم اضغط إرسال.</p>
 
-    <label for="email">Email</label>
-    <input type="email" id="email" name="email" required />
+      <!-- Netlify form: posts to thank-you.html -->
+      <form name="contact" method="POST" action="/thank-you.html" data-netlify="true" data-netlify-honeypot="bot-field" accept-charset="UTF-8">
+        <!-- Required by Netlify -->
+        <input type="hidden" name="form-name" value="contact" />
+        <!-- Honeypot to reduce spam -->
+        <p style="display:none;">
+          <label>اترك هذا الحقل فارغًا:
+            <input name="bot-field" />
+          </label>
+        </p>
 
-    <label for="message">Message</label>
-    <textarea id="message" name="message" rows="5" required></textarea>
+        <div>
+          <label for="name">الاسم</label>
+          <input id="name" name="name" autocomplete="name" required />
+        </div>
 
-    <button type="submit">Send Message</button>
-  </form>
+        <div>
+          <label for="email">البريد الإلكتروني</label>
+          <input id="email" name="email" type="email" inputmode="email" autocomplete="email" required />
+        </div>
 
+        <div>
+          <label for="message">الرسالة</label>
+          <textarea id="message" name="message" rows="6" required></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="submit">إرسال</button>
+          <span class="hint">سيتم تحويلك إلى صفحة الشكر بعد الإرسال.</span>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <div>© <span id="y"></span> لأغراض تعليمية ونبيلة.</div>
+  </footer>
+
+  <script>
+    // Lightweight, isolated footer year; no form interception.
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
