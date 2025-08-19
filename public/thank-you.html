@@ -1,47 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>Thank You</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>شكرًا لك</title>
   <style>
-    body { 
-      font-family: system-ui, sans-serif; 
-      display: flex; 
-      justify-content: center; 
-      align-items: center; 
-      height: 100vh; 
-      background: #f9f9f9; 
-      margin: 0; 
+    :root {
+      --bg: #f9fafb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #0d6efd;
+      --border: #e5e7eb;
     }
-    .box {
-      background: #fff; 
-      padding: 2rem; 
-      border-radius: 8px; 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-      text-align: center; 
-      max-width: 400px;
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 600px at 50% -200px, #eef5ff 0%, var(--bg) 50%, var(--bg) 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Naskh Arabic", "Noto Sans Arabic", "Helvetica Neue", Arial, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+    }
+    .nav a:hover { background: #f2f2f2; }
+    .nav .brand { font-weight: 700; color: var(--accent); margin-inline-end: 0.5rem; }
+
+    main {
+      display: grid;
+      place-items: center;
+      padding: 2rem 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 720px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 6px 24px rgba(13,110,253,0.08);
+    }
+    h1 { margin: 0 0 0.5rem 0; font-size: 1.8rem; }
+    p { margin: 0.25rem 0 1.25rem 0; color: var(--muted); }
+    .home-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .home-link:hover { filter: brightness(0.96); }
+    footer {
+      max-width: 900px;
+      margin: 2rem auto 3rem;
+      color: var(--muted);
+      padding: 0 1rem;
+      font-size: 0.95rem;
     }
     .icon {
-      font-size: 3rem; 
-      color: #28a745; 
+      width: 1.1em;
+      height: 1.1em;
+      flex: 0 0 auto;
     }
-    h1 { color: #28a745; margin-top: 1rem; }
-    p { color: #555; margin-top: 0.5rem; }
-    a { 
-      display: inline-block; 
-      margin-top: 1.5rem; 
-      color: #007bff; 
-      text-decoration: none; 
-    }
-    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="box">
-    <div class="icon">✔</div>
-    <h1>Thank you!</h1>
-    <p>Your message has been received successfully. We'll get back to you as soon as possible.</p>
-    <a href="/">Back to Home Page</a>
-  </div>
+  <header>
+    <nav class="nav" aria-label="التنقل">
+      <a class="brand" href="/">محلل صرفي</a>
+      <a href="/">الرئيسية</a>
+      <a href="/contact.html">اتصل بنا</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card" aria-labelledby="thanks-title">
+      <h1 id="thanks-title">شكرًا لتواصلك معنا</h1>
+      <p>تم استلام رسالتك بنجاح. سنراجعها ونرد عليك في أقرب وقت ممكن.</p>
+
+      <a class="home-link" href="/" aria-label="العودة إلى الصفحة الرئيسية">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor" d="M10.59 7.41 9.17 8.83 12.34 12l-3.17 3.17 1.42 1.42L15.17 12 10.59 7.41z"/>
+        </svg>
+        <span>العودة إلى الرئيسية</span>
+      </a>
+    </section>
+  </main>
+
+  <footer>
+    <div>© <span id="y"></span> لأغراض تعليمية ونبيلة.</div>
+  </footer>
+
+  <script>
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
