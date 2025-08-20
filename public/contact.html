@@ -134,16 +134,21 @@
       <p class="lead">يسعدنا تواصلك. رجاءً املأ الحقول أدناه ثم اضغط إرسال.</p>
 
       <!-- Netlify form -->
-      <form name="contact"
-            method="POST"
-            action="/thank-you.html"
-            data-netlify="true"
-            data-netlify-honeypot="bot-field"
-            accept-charset="UTF-8"
-            target="_top"
-            rel="external"
-            onsubmit="setTimeout(function(){ window.location.replace('/thank-you.html'); }, 100);">
+      <form
+        name="contact"
+        method="POST"
+        action="/thank-you.html"
+        data-netlify="true"
+        data-netlify-honeypot="bot-field"
+        accept-charset="UTF-8"
+        target="_top"
+        rel="external"
+        onsubmit="setTimeout(function(){ window.location.replace('/thank-you.html'); }, 100);">
+
+        <!-- Hidden form-name FIRST for detection -->
         <input type="hidden" name="form-name" value="contact" />
+
+        <!-- Honeypot field -->
         <p style="display:none;">
           <label>اترك هذا الحقل فارغًا:
             <input name="bot-field" />
