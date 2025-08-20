@@ -2,6 +2,7 @@
   command = "npm run build"
   publish = "dist"
 
+# ✅ API endpoint
 [[redirects]]
   from   = "/analyze"
   to     = "https://arabic-miracle-api.onrender.com/analyze"
@@ -23,6 +24,7 @@
   from = "/contact.html"
   to   = "/contact.html"
   status = 200
+  force = true   # Ensure no SPA or other redirect touches it
 
 [[redirects]]
   from = "/instructions.html"
