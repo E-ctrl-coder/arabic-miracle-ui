@@ -28,8 +28,8 @@ function highlightStemOrRoot(text, entry) {
   if (!stemNorm && !rootNorm) return text;
 
   const parts = [];
-  if (stemNorm) parts.push(stemNorm);
-  if (rootNorm && rootNorm !== stemNorm) parts.push(rootNorm);
+  if (rootNorm) parts.push(rootNorm);
+if (stemNorm && stemNorm !== rootNorm) parts.push(stemNorm);
 
   const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(
