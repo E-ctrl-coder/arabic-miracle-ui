@@ -152,129 +152,75 @@ export default function App() {
   }, []);
 
   const handleSearch = () => {
-    const raw = searchTerm.trim();
-    if (!raw || loading) {
-      setResults([]);
-      return;
-    }
-    const termArabic = normalizeArabicFromLoader(
-      buckwalterToArabic(raw)
+  const raw = searchTerm.trim();
+  if (!raw || loading) {
+    setResults([]);
+    return;
+  }
+
+  const termArabic = normalizeArabicFromLoader(buckwalterToArabic(raw));
+  if (!termArabic) {
+    setResults([]);
+    return;
+  }
+
+  let matchedEntry = null;
+  let occurrences = [];
+
+  // ---------------- Priority 1: Dual-root match ----------------
+  matchedEntry = qacData.find(e =>
+    e.normRoot &&
+    e.normStem &&
+    e.normRoot === e.normStem &&
+    e.normRoot === termArabic
+  );
+
+  // ---------------- Priority 2: Segmentation root match ----------------
+  if (!matchedEntry) {
+    matchedEntry = qacData.find(e => e.normStem === termArabic);
+  }
+
+  // ---------------- Priority 3: Fuzzy form match ----------------
+  if (!matchedEntry) {
+    matchedEntry = qacData.find(e => trigramAffixMatch(termArabic, e.normForm));
+  }
+
+  // ---------------- Expansion to all derivatives ----------------
+  if (matchedEntry) {
+    const anchorRoot = matchedEntry.normRoot || matchedEntry.normStem || termArabic;
+    occurrences = qacData.filter(e =>
+      e.normRoot === anchorRoot ||
+      e.normStem === anchorRoot
     );
-    if (!termArabic) {
-      setResults([]);
-      return;
+  }
+
+  // ---------------- Deduplicate & sort ----------------
+  const seen = new Set();
+  const unique = [];
+  for (const entry of occurrences) {
+    const key = `${entry.form}-${entry.location ?? `${entry.sura}:${entry.verse}:${entry.wordNum}`}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(entry);
     }
+  }
 
-    let occurrences = [];
-    let matchedEntry = null;
+  unique.sort((a, b) => {
+    const sa = Number(a.sura) || 0;
+    const sb = Number(b.sura) || 0;
+    if (sa !== sb) return sa - sb;
+    const va = Number(a.verse) || 0;
+    const vb = Number(b.verse) || 0;
+    if (va !== vb) return va - vb;
+    const wa = Number(a.wordNum) || 0;
+    const wb = Number(b.wordNum) || 0;
+    if (wa !== wb) return wa - wb;
+    return String(a.form || '').localeCompare(String(b.form || ''));
+  });
 
-    // 1. Exact root (verbs only)
-    if (termArabic.length >= 2 && termArabic.length <= 4) {
-      matchedEntry = qacData.find(
-        (e) => e.tag === 'V' && e.normRoot === termArabic
-      );
-    }
-
-    // 2. Exact form
-    if (!matchedEntry) {
-      matchedEntry = qacData.find(
-        (e) => e.normForm === termArabic
-      );
-    }
-
-    // 3. Exact stem
-    if (!matchedEntry) {
-      matchedEntry = qacData.find(
-        (e) => e.normStem === termArabic
-      );
-    }
-
-    // 4. Fuzzy root (verbs only)
-    if (!matchedEntry) {
-      matchedEntry = qacData.find(
-        (e) => e.tag === 'V' && trigramAffixMatch(termArabic, e.normRoot)
-      );
-    }
-
-    // 5. Fuzzy stem
-    if (!matchedEntry) {
-      matchedEntry = qacData.find(
-        (e) => trigramAffixMatch(termArabic, e.normStem)
-      );
-    }
-
-    // 6. Fuzzy form
-    if (!matchedEntry) {
-      matchedEntry = qacData.find(
-        (e) => trigramAffixMatch(termArabic, e.normForm)
-      );
-    }
-
-    // 7. Near-root (verbs)
-    if (!matchedEntry) {
-      matchedEntry = qacData.find(
-        (e) => e.tag === 'V' && nearRootMatch(termArabic, e.normRoot)
-      );
-    }
-
-    // Expand to all matches of same type
-    if (matchedEntry) {
-      switch (true) {
-        case termArabic === matchedEntry.normRoot && matchedEntry.tag === 'V':
-          occurrences = qacData.filter(
-            (e) => e.tag === 'V' && e.normRoot === matchedEntry.normRoot
-          );
-          break;
-        case termArabic === matchedEntry.normForm:
-          occurrences = qacData.filter(
-            (e) => e.normForm === matchedEntry.normForm
-          );
-          break;
-        case termArabic === matchedEntry.normStem:
-          occurrences = qacData.filter(
-            (e) => e.normStem === matchedEntry.normStem
-          );
-          break;
-        default:
-          occurrences = qacData.filter(
-            (e) =>
-              trigramAffixMatch(termArabic, e.normRoot) ||
-              trigramAffixMatch(termArabic, e.normStem) ||
-              trigramAffixMatch(termArabic, e.normForm)
-          );
-          break;
-      }
-    }
-
-    // Deduplicate & sort
-    const seen = new Set();
-    const unique = [];
-    for (const entry of occurrences) {
-      const key = `${entry.form}-${entry.location ?? `${entry.sura}:${entry.verse}:${entry.wordNum}`}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(entry);
-      }
-    }
-
-    unique.sort((a, b) => {
-      const sa = Number(a.sura) || 0;
-      const sb = Number(b.sura) || 0;
-      if (sa !== sb) return sa - sb;
-      const va = Number(a.verse) || 0;
-      const vb = Number(b.verse) || 0;
-      if (va !== vb) return va - vb;
-      const wa = Number(a.wordNum) || 0;
-      const wb = Number(b.wordNum) || 0;
-      if (wa !== wb) return wa - wb;
-      // stable tie-breaker on form to avoid flicker
-      return String(a.form || '').localeCompare(String(b.form || ''));
-    });
-
-    setResults(unique);
-    setOpenReference(null);
-  };
-
+  setResults(unique);
+  setOpenReference(null);
+};
   const handleVerseClick = (sura, verse) => {
     if (openReference && openReference.sura === sura && openReference.verse === verse) {
       setOpenReference(null);
