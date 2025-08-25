@@ -18,18 +18,24 @@ const posMap = {
 // ---------------- Highlight helper ----------------
 function highlightStemOrRoot(text, entry) {
   if (!text || !entry) return text;
+
+  // Normalize target text once
   const verseNorm = normalizeArabic(text);
+
+  // Compute normalized root and stem from entry
   const stemNorm = normalizeArabic(
     buckwalterToArabic(entry?.segments?.stem || '')
   );
   const rootNorm = normalizeArabic(
     buckwalterToArabic(entry?.root || '')
   );
+
   if (!stemNorm && !rootNorm) return text;
 
+  // Build a diacritic-tolerant regex for root and stem
   const parts = [];
   if (rootNorm) parts.push(rootNorm);
-if (stemNorm && stemNorm !== rootNorm) parts.push(stemNorm);
+  if (stemNorm && stemNorm !== rootNorm) parts.push(stemNorm);
 
   const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(
@@ -38,10 +44,17 @@ if (stemNorm && stemNorm !== rootNorm) parts.push(stemNorm);
     'g'
   );
 
-  return verseNorm.replace(
-    pattern,
-    (match) => `<span class="hl-stem">${match}</span>`
-  );
+  // Choose class by comparing normalized match to root or stem
+  return verseNorm.replace(pattern, (match) => {
+    const mNorm = normalizeArabic(match);
+    if (rootNorm && mNorm === rootNorm) {
+      return `<span class="hl-match-blue">${match}</span>`;
+    }
+    if (stemNorm && mNorm === stemNorm) {
+      return `<span class="hl-stem">${match}</span>`;
+    }
+    return match;
+  });
 }
 
 // ---------------- Data coercion ----------------
@@ -152,75 +165,88 @@ export default function App() {
   }, []);
 
   const handleSearch = () => {
-  const raw = searchTerm.trim();
-  if (!raw || loading) {
-    setResults([]);
-    return;
-  }
-
-  const termArabic = normalizeArabicFromLoader(buckwalterToArabic(raw));
-  if (!termArabic) {
-    setResults([]);
-    return;
-  }
-
-  let matchedEntry = null;
-  let occurrences = [];
-
-  // ---------------- Priority 1: Dual-root match ----------------
-  matchedEntry = qacData.find(e =>
-    e.normRoot &&
-    e.normStem &&
-    e.normRoot === e.normStem &&
-    e.normRoot === termArabic
-  );
-
-  // ---------------- Priority 2: Segmentation root match ----------------
-  if (!matchedEntry) {
-    matchedEntry = qacData.find(e => e.normStem === termArabic);
-  }
-
-  // ---------------- Priority 3: Fuzzy form match ----------------
-  if (!matchedEntry) {
-    matchedEntry = qacData.find(e => trigramAffixMatch(termArabic, e.normForm));
-  }
-
-  // ---------------- Expansion to all derivatives ----------------
-  if (matchedEntry) {
-    const anchorRoot = matchedEntry.normRoot || matchedEntry.normStem || termArabic;
-    occurrences = qacData.filter(e =>
-      e.normRoot === anchorRoot ||
-      e.normStem === anchorRoot
-    );
-  }
-
-  // ---------------- Deduplicate & sort ----------------
-  const seen = new Set();
-  const unique = [];
-  for (const entry of occurrences) {
-    const key = `${entry.form}-${entry.location ?? `${entry.sura}:${entry.verse}:${entry.wordNum}`}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(entry);
+    const raw = searchTerm.trim();
+    if (!raw || loading) {
+      setResults([]);
+      return;
     }
-  }
 
-  unique.sort((a, b) => {
-    const sa = Number(a.sura) || 0;
-    const sb = Number(b.sura) || 0;
-    if (sa !== sb) return sa - sb;
-    const va = Number(a.verse) || 0;
-    const vb = Number(b.verse) || 0;
-    if (va !== vb) return va - vb;
-    const wa = Number(a.wordNum) || 0;
-    const wb = Number(b.wordNum) || 0;
-    if (wa !== wb) return wa - wb;
-    return String(a.form || '').localeCompare(String(b.form || ''));
-  });
+    const termArabic = normalizeArabicFromLoader(buckwalterToArabic(raw));
+    if (!termArabic) {
+      setResults([]);
+      return;
+    }
 
-  setResults(unique);
-  setOpenReference(null);
-};
+    let matchedEntry = null;
+    let occurrences = [];
+
+    // ---------------- Priority 1: Dual-root match ----------------
+    matchedEntry = qacData.find(e =>
+      e.normRoot &&
+      e.normStem &&
+      e.normRoot === e.normStem &&
+      e.normRoot === termArabic
+    );
+
+    // ---------------- Priority 2: Segmentation root match ----------------
+    if (!matchedEntry) {
+      matchedEntry = qacData.find(e => e.normStem === termArabic);
+    }
+
+    // ---------------- Priority 3: Relaxed root-family match ----------------
+    // Use nearRootMatch on normalized roots to anchor a family if exact matches failed
+    if (!matchedEntry) {
+      matchedEntry = qacData.find(e =>
+        e.normRoot && nearRootMatch(termArabic, e.normRoot)
+      );
+    }
+
+    // ---------------- Priority 4: Fuzzy form match ----------------
+    if (!matchedEntry) {
+      matchedEntry = qacData.find(e => trigramAffixMatch(termArabic, e.normForm));
+    }
+
+    // ---------------- Expansion to all derivatives and family ----------------
+    if (matchedEntry) {
+      const anchorRoot = matchedEntry.normRoot || matchedEntry.normStem || termArabic;
+      occurrences = qacData.filter(e =>
+        // exact root/stem family
+        e.normRoot === anchorRoot ||
+        e.normStem === anchorRoot ||
+        // relaxed family symmetry
+        (e.normRoot && nearRootMatch(e.normRoot, anchorRoot)) ||
+        (e.normRoot && nearRootMatch(anchorRoot, e.normRoot))
+      );
+    }
+
+    // ---------------- Deduplicate & sort ----------------
+    const seen = new Set();
+    const unique = [];
+    for (const entry of occurrences) {
+      const key = `${entry.form}-${entry.location ?? `${entry.sura}:${entry.verse}:${entry.wordNum}`}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(entry);
+      }
+    }
+
+    unique.sort((a, b) => {
+      const sa = Number(a.sura) || 0;
+      const sb = Number(b.sura) || 0;
+      if (sa !== sb) return sa - sb;
+      const va = Number(a.verse) || 0;
+      const vb = Number(b.verse) || 0;
+      if (va !== vb) return va - vb;
+      const wa = Number(a.wordNum) || 0;
+      const wb = Number(b.wordNum) || 0;
+      if (wa !== wb) return wa - wb;
+      return String(a.form || '').localeCompare(String(b.form || ''));
+    });
+
+    setResults(unique);
+    setOpenReference(null);
+  };
+
   const handleVerseClick = (sura, verse) => {
     if (openReference && openReference.sura === sura && openReference.verse === verse) {
       setOpenReference(null);
